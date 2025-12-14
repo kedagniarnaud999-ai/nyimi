@@ -1,38 +1,61 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Filter, MapPin, Calendar } from 'lucide-react';
+import { Filter, MapPin, Calendar, Loader2 } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import RideCard from '@/components/RideCard';
+import ReservationDialog from '@/components/ReservationDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { mockRides } from '@/data/mockRides';
-import { Ride } from '@/types/ride';
-import { toast } from 'sonner';
+import { useRides } from '@/hooks/useRides';
+
+interface SelectedRide {
+  id: string;
+  departure_city: string;
+  arrival_city: string;
+  departure_date: string;
+  departure_time: string;
+  price: number;
+  available_seats: number;
+  driver: {
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+}
 
 const Rides = () => {
   const [searchParams] = useSearchParams();
   const [origin, setOrigin] = useState(searchParams.get('origin') || '');
   const [destination, setDestination] = useState(searchParams.get('destination') || '');
   const [date, setDate] = useState(searchParams.get('date') || '');
+  const [selectedRide, setSelectedRide] = useState<SelectedRide | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const filteredRides = useMemo(() => {
-    return mockRides.filter((ride) => {
-      const matchOrigin = !origin || ride.origin.toLowerCase().includes(origin.toLowerCase());
-      const matchDestination = !destination || ride.destination.toLowerCase().includes(destination.toLowerCase());
-      const matchDate = !date || ride.date === date;
-      return matchOrigin && matchDestination && matchDate;
-    });
+  const { rides, loading, fetchRides } = useRides();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchRides({
+        origin: origin || undefined,
+        destination: destination || undefined,
+        date: date || undefined,
+      });
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [origin, destination, date]);
 
-  const handleSelectRide = (ride: Ride) => {
-    toast.success(
-      <div>
-        <p className="font-semibold">Trajet sélectionné !</p>
-        <p className="text-sm">{ride.origin} → {ride.destination}</p>
-        <p className="text-sm">Contactez {ride.driverName} pour confirmer</p>
-      </div>
-    );
+  const handleSelectRide = (ride: SelectedRide) => {
+    setSelectedRide(ride);
+    setDialogOpen(true);
+  };
+
+  const handleReservationSuccess = () => {
+    fetchRides({
+      origin: origin || undefined,
+      destination: destination || undefined,
+      date: date || undefined,
+    });
   };
 
   return (
@@ -71,9 +94,17 @@ const Rides = () => {
                   className="pl-10"
                 />
               </div>
-              <Button variant="soft" className="md:w-auto">
+              <Button 
+                variant="outline" 
+                className="md:w-auto"
+                onClick={() => {
+                  setOrigin('');
+                  setDestination('');
+                  setDate('');
+                }}
+              >
                 <Filter className="w-4 h-4 mr-2" />
-                Filtres
+                Réinitialiser
               </Button>
             </div>
           </div>
@@ -87,15 +118,46 @@ const Rides = () => {
                 Trajets disponibles
               </h1>
               <p className="text-muted-foreground mt-1">
-                {filteredRides.length} trajet{filteredRides.length > 1 ? 's' : ''} trouvé{filteredRides.length > 1 ? 's' : ''}
+                {loading ? 'Chargement...' : `${rides.length} trajet${rides.length > 1 ? 's' : ''} trouvé${rides.length > 1 ? 's' : ''}`}
               </p>
             </div>
           </div>
 
-          {filteredRides.length > 0 ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          ) : rides.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredRides.map((ride) => (
-                <RideCard key={ride.id} ride={ride} onSelect={handleSelectRide} />
+              {rides.map((ride) => (
+                <RideCard 
+                  key={ride.id} 
+                  ride={{
+                    id: ride.id,
+                    driverName: ride.driver?.full_name || 'Conducteur',
+                    driverPhoto: ride.driver?.avatar_url || undefined,
+                    driverRating: ride.driver?.rating || 5,
+                    origin: ride.departure_city,
+                    destination: ride.arrival_city,
+                    departureTime: ride.departure_time.slice(0, 5),
+                    date: ride.departure_date,
+                    availableSeats: ride.available_seats,
+                    price: ride.price,
+                    vehicleType: ride.driver?.vehicle_brand && ride.driver?.vehicle_model 
+                      ? `${ride.driver.vehicle_brand} ${ride.driver.vehicle_model}`
+                      : 'Non spécifié',
+                  }}
+                  onSelect={() => handleSelectRide({
+                    id: ride.id,
+                    departure_city: ride.departure_city,
+                    arrival_city: ride.arrival_city,
+                    departure_date: ride.departure_date,
+                    departure_time: ride.departure_time,
+                    price: ride.price,
+                    available_seats: ride.available_seats,
+                    driver: ride.driver,
+                  })}
+                />
               ))}
             </div>
           ) : (
@@ -124,6 +186,13 @@ const Rides = () => {
           )}
         </section>
       </main>
+
+      <ReservationDialog
+        ride={selectedRide}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        onSuccess={handleReservationSuccess}
+      />
 
       <Footer />
     </div>

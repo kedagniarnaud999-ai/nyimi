@@ -7,7 +7,7 @@ interface CreateReservationData {
   ride_id: string;
   seats_booked: number;
   total_price: number;
-  payment_method?: 'mtn' | 'moov' | 'cash';
+  payment_method?: 'mtn_momo' | 'moov_money' | 'cash';
 }
 
 export const useReservations = () => {
@@ -44,14 +44,14 @@ export const useReservations = () => {
       // Create the reservation
       const { error: reservationError } = await supabase
         .from('reservations')
-        .insert({
+        .insert([{
           ride_id: data.ride_id,
           passenger_id: profile.id,
           seats_booked: data.seats_booked,
           total_price: data.total_price,
-          payment_method: data.payment_method,
-          status: 'pending',
-        });
+          payment_method: data.payment_method as "cash" | "moov_money" | "mtn_momo" | undefined,
+          status: 'pending' as const,
+        }]);
 
       if (reservationError) throw reservationError;
 
