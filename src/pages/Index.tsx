@@ -7,15 +7,14 @@ import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { mockRides } from '@/data/mockRides';
 import { useNavigate } from 'react-router-dom';
-import { Ride } from '@/types/ride';
 import { toast } from 'sonner';
 
 const Index = () => {
   const navigate = useNavigate();
   const featuredRides = mockRides.slice(0, 3);
 
-  const handleSelectRide = (ride: Ride) => {
-    toast.success(`Trajet sélectionné : ${ride.origin} → ${ride.destination}`);
+  const handleSelectRide = () => {
+    navigate('/rides');
   };
 
   const features = [
@@ -122,7 +121,22 @@ const Index = () => {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featuredRides.map((ride, index) => (
               <div key={ride.id} className="animate-slide-up" style={{ animationDelay: `${index * 0.1}s` }}>
-                <RideCard ride={ride} onSelect={handleSelectRide} />
+                <RideCard 
+                  ride={{
+                    id: ride.id,
+                    driverName: ride.driverName,
+                    driverPhoto: ride.driverPhoto,
+                    driverRating: ride.driverRating,
+                    origin: ride.origin,
+                    destination: ride.destination,
+                    departureTime: ride.departureTime,
+                    date: ride.date,
+                    availableSeats: ride.availableSeats,
+                    price: ride.price,
+                    vehicleType: ride.vehicleType,
+                  }}
+                  onSelect={handleSelectRide} 
+                />
               </div>
             ))}
           </div>

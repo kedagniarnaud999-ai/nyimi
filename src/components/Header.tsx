@@ -153,6 +153,17 @@ const Header = () => {
                     </div>
                     <Button
                       variant="ghost"
+                      className="justify-start"
+                      onClick={() => {
+                        navigate('/profile');
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Mon profil
+                    </Button>
+                    <Button
+                      variant="ghost"
                       className="justify-start text-destructive"
                       onClick={() => {
                         handleSignOut();

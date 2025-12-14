@@ -34,7 +34,7 @@ interface ReservationDialogProps {
   onSuccess?: () => void;
 }
 
-type PaymentMethod = 'mtn' | 'moov' | 'cash';
+type PaymentMethod = 'mtn_momo' | 'moov_money' | 'cash';
 
 const ReservationDialog = ({ ride, open, onOpenChange, onSuccess }: ReservationDialogProps) => {
   const navigate = useNavigate();
@@ -42,11 +42,11 @@ const ReservationDialog = ({ ride, open, onOpenChange, onSuccess }: ReservationD
   const { createReservation, loading } = useReservations();
   
   const [seats, setSeats] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mtn');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('mtn_momo');
 
   const paymentOptions: { id: PaymentMethod; label: string; color: string }[] = [
-    { id: 'mtn', label: 'MTN MoMo', color: 'bg-amber-100 text-amber-800 border-amber-300' },
-    { id: 'moov', label: 'Moov Money', color: 'bg-blue-100 text-blue-800 border-blue-300' },
+    { id: 'mtn_momo', label: 'MTN MoMo', color: 'bg-amber-100 text-amber-800 border-amber-300' },
+    { id: 'moov_money', label: 'Moov Money', color: 'bg-blue-100 text-blue-800 border-blue-300' },
     { id: 'cash', label: 'Espèces', color: 'bg-green-100 text-green-800 border-green-300' },
   ];
 
