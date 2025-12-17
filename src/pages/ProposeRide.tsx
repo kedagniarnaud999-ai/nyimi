@@ -11,14 +11,6 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useRides, estimateFuelCost, beninDistances } from '@/hooks/useRides';
-import LocationPicker from '@/components/LocationPicker';
-
-interface Location {
-  lat: number;
-  lng: number;
-  address: string;
-  city: string;
-}
 
 const ProposeRide = () => {
   const navigate = useNavigate();
@@ -28,10 +20,11 @@ const ProposeRide = () => {
   const [submitting, setSubmitting] = useState(false);
   const [fuelEstimate, setFuelEstimate] = useState<number | null>(null);
   
-  const [departureLocation, setDepartureLocation] = useState<Location>({ lat: 0, lng: 0, address: '', city: '' });
-  const [arrivalLocation, setArrivalLocation] = useState<Location>({ lat: 0, lng: 0, address: '', city: '' });
-  
   const [formData, setFormData] = useState({
+    departure_city: '',
+    arrival_city: '',
+    departure_address: '',
+    arrival_address: '',
     departure_date: '',
     departure_time: '',
     total_seats: '',
@@ -50,8 +43,8 @@ const ProposeRide = () => {
 
   useEffect(() => {
     // Calculate fuel cost estimation
-    const departure = departureLocation.city.toLowerCase().trim();
-    const arrival = arrivalLocation.city.toLowerCase().trim();
+    const departure = formData.departure_city.toLowerCase().trim();
+    const arrival = formData.arrival_city.toLowerCase().trim();
     
     // Find matching cities
     let distance: number | null = null;
@@ -71,7 +64,7 @@ const ProposeRide = () => {
     } else {
       setFuelEstimate(null);
     }
-  }, [departureLocation.city, arrivalLocation.city]);
+  }, [formData.departure_city, formData.arrival_city]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -80,7 +73,7 @@ const ProposeRide = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!departureLocation.city || !arrivalLocation.city || !formData.departure_date || !formData.departure_time) {
+    if (!formData.departure_city || !formData.arrival_city || !formData.departure_date || !formData.departure_time) {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
@@ -104,10 +97,10 @@ const ProposeRide = () => {
     setSubmitting(true);
     
     const result = await createRide({
-      departure_city: departureLocation.city,
-      arrival_city: arrivalLocation.city,
-      departure_address: departureLocation.address || undefined,
-      arrival_address: arrivalLocation.address || undefined,
+      departure_city: formData.departure_city,
+      arrival_city: formData.arrival_city,
+      departure_address: formData.departure_address || undefined,
+      arrival_address: formData.arrival_address || undefined,
       departure_date: formData.departure_date,
       departure_time: formData.departure_time,
       total_seats: parseInt(formData.total_seats),
@@ -163,26 +156,54 @@ const ProposeRide = () => {
             )}
 
             <form onSubmit={handleSubmit} className="bg-card rounded-2xl shadow-card p-6 md:p-8 space-y-6">
-              {/* Route with Map */}
+              {/* Route */}
               <div className="space-y-4">
                 <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <MapPin className="w-5 h-5 text-primary" />
                   Itinéraire
                 </h2>
-                
-                <LocationPicker
-                  label="Lieu de départ *"
-                  placeholder="Rechercher le lieu de départ..."
-                  value={departureLocation}
-                  onChange={setDepartureLocation}
-                />
-                
-                <LocationPicker
-                  label="Lieu d'arrivée *"
-                  placeholder="Rechercher le lieu d'arrivée..."
-                  value={arrivalLocation}
-                  onChange={setArrivalLocation}
-                />
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="departure_city">Ville de départ *</Label>
+                    <Input
+                      id="departure_city"
+                      name="departure_city"
+                      placeholder="Ex: Cotonou"
+                      value={formData.departure_city}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="arrival_city">Ville d'arrivée *</Label>
+                    <Input
+                      id="arrival_city"
+                      name="arrival_city"
+                      placeholder="Ex: Porto-Novo"
+                      value={formData.arrival_city}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="departure_address">Adresse de départ (optionnel)</Label>
+                    <Input
+                      id="departure_address"
+                      name="departure_address"
+                      placeholder="Quartier, point de repère..."
+                      value={formData.departure_address}
+                      onChange={handleChange}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="arrival_address">Adresse d'arrivée (optionnel)</Label>
+                    <Input
+                      id="arrival_address"
+                      name="arrival_address"
+                      placeholder="Quartier, point de repère..."
+                      value={formData.arrival_address}
+                      onChange={handleChange}
+                    />
+                  </div>
+                </div>
                 
                 {/* Fuel Estimate */}
                 {fuelEstimate && (
