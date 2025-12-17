@@ -1,18 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from 'react-leaflet';
-import L from 'leaflet';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, MapPin, X } from 'lucide-react';
-import 'leaflet/dist/leaflet.css';
 
-// Fix for default marker icons in Leaflet with Vite
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
+// Lazy load map components to avoid SSR issues
+const MapComponent = lazy(() => import('./MapComponent'));
 
 interface Location {
   lat: number;
@@ -39,23 +31,6 @@ interface SearchResult {
     village?: string;
     municipality?: string;
   };
-}
-
-function MapClickHandler({ onLocationSelect }: { onLocationSelect: (lat: number, lng: number) => void }) {
-  useMapEvents({
-    click: (e) => {
-      onLocationSelect(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-}
-
-function MapCenterUpdater({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, map.getZoom());
-  }, [center, map]);
-  return null;
 }
 
 const LocationPicker: React.FC<LocationPickerProps> = ({
@@ -224,21 +199,14 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       {/* Map */}
       {showMap && (
         <div className="relative h-64 rounded-lg overflow-hidden border border-border">
-          <MapContainer
-            center={mapCenter}
-            zoom={value ? 15 : 8}
-            style={{ height: '100%', width: '100%' }}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          <Suspense fallback={<div className="h-full w-full bg-muted flex items-center justify-center">Chargement de la carte...</div>}>
+            <MapComponent
+              center={mapCenter}
+              zoom={value ? 15 : 8}
+              markerPosition={value && value.lat !== 0 ? [value.lat, value.lng] : null}
+              onLocationSelect={handleMapClick}
             />
-            <MapClickHandler onLocationSelect={handleMapClick} />
-            <MapCenterUpdater center={mapCenter} />
-            {value && value.lat !== 0 && (
-              <Marker position={[value.lat, value.lng]} />
-            )}
-          </MapContainer>
+          </Suspense>
           <p className="absolute bottom-2 left-2 text-xs bg-background/90 px-2 py-1 rounded text-muted-foreground">
             Cliquez sur la carte pour sélectionner un emplacement
           </p>
