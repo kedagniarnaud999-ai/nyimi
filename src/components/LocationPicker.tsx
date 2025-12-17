@@ -1,10 +1,7 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, MapPin, X } from 'lucide-react';
-
-// Lazy load map components to avoid SSR issues
-const MapComponent = lazy(() => import('./MapComponent'));
 
 interface Location {
   lat: number;
@@ -44,11 +41,21 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [showMap, setShowMap] = useState(false);
+  const [MapComponent, setMapComponent] = useState<React.ComponentType<any> | null>(null);
   const searchRef = useRef<HTMLDivElement>(null);
 
   // Default center: Bénin (Cotonou)
   const defaultCenter: [number, number] = [6.3654, 2.4183];
   const mapCenter: [number, number] = value ? [value.lat, value.lng] : defaultCenter;
+
+  // Dynamically import map component only on client side
+  useEffect(() => {
+    if (showMap && !MapComponent) {
+      import('./MapComponent').then((mod) => {
+        setMapComponent(() => mod.default);
+      });
+    }
+  }, [showMap, MapComponent]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -199,14 +206,18 @@ const LocationPicker: React.FC<LocationPickerProps> = ({
       {/* Map */}
       {showMap && (
         <div className="relative h-64 rounded-lg overflow-hidden border border-border">
-          <Suspense fallback={<div className="h-full w-full bg-muted flex items-center justify-center">Chargement de la carte...</div>}>
+          {MapComponent ? (
             <MapComponent
               center={mapCenter}
               zoom={value ? 15 : 8}
               markerPosition={value && value.lat !== 0 ? [value.lat, value.lng] : null}
               onLocationSelect={handleMapClick}
             />
-          </Suspense>
+          ) : (
+            <div className="h-full w-full bg-muted flex items-center justify-center">
+              <span className="text-muted-foreground">Chargement de la carte...</span>
+            </div>
+          )}
           <p className="absolute bottom-2 left-2 text-xs bg-background/90 px-2 py-1 rounded text-muted-foreground">
             Cliquez sur la carte pour sélectionner un emplacement
           </p>
