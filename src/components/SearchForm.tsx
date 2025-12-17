@@ -1,14 +1,17 @@
-import { MapPin, Calendar, Search, ArrowRight } from 'lucide-react';
+import { MapPin, Calendar, Search, ArrowRight, Map } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import LocationMapPicker from './LocationMapPicker';
 
 const SearchForm = () => {
   const navigate = useNavigate();
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [date, setDate] = useState('');
+  const [showOriginMap, setShowOriginMap] = useState(false);
+  const [showDestinationMap, setShowDestinationMap] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,25 +29,47 @@ const SearchForm = () => {
       <form onSubmit={handleSearch} className="bg-card rounded-2xl shadow-card p-4 md:p-6 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           {/* Origin */}
-          <div className="relative">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary" />
-            <Input
-              placeholder="Départ (ex: Cotonou)"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              className="pl-12"
-            />
+          <div className="relative flex gap-2">
+            <div className="relative flex-1">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary" />
+              <Input
+                placeholder="Départ (ex: Cotonou)"
+                value={origin}
+                onChange={(e) => setOrigin(e.target.value)}
+                className="pl-12"
+              />
+            </div>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="icon"
+              onClick={() => setShowOriginMap(true)}
+              title="Choisir sur la carte"
+            >
+              <Map className="w-4 h-4" />
+            </Button>
           </div>
 
           {/* Destination */}
-          <div className="relative">
-            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
-            <Input
-              placeholder="Destination (ex: Porto-Novo)"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              className="pl-12"
-            />
+          <div className="relative flex gap-2">
+            <div className="relative flex-1">
+              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
+              <Input
+                placeholder="Destination (ex: Porto-Novo)"
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                className="pl-12"
+              />
+            </div>
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="icon"
+              onClick={() => setShowDestinationMap(true)}
+              title="Choisir sur la carte"
+            >
+              <Map className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
@@ -86,6 +111,32 @@ const SearchForm = () => {
           ))}
         </div>
       </div>
+
+      {/* Map Pickers */}
+      {showOriginMap && (
+        <LocationMapPicker
+          title="Sélectionner le lieu de départ"
+          onSelectLocation={(location) => {
+            // Extract city name from the full address
+            const cityName = location.name.split(',')[0].trim();
+            setOrigin(cityName);
+            setShowOriginMap(false);
+          }}
+          onClose={() => setShowOriginMap(false)}
+        />
+      )}
+
+      {showDestinationMap && (
+        <LocationMapPicker
+          title="Sélectionner la destination"
+          onSelectLocation={(location) => {
+            const cityName = location.name.split(',')[0].trim();
+            setDestination(cityName);
+            setShowDestinationMap(false);
+          }}
+          onClose={() => setShowDestinationMap(false)}
+        />
+      )}
     </div>
   );
 };
