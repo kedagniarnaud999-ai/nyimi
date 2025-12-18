@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { useRides, estimateFuelCost, beninDistances } from '@/hooks/useRides';
+import { useRides, getDistance, estimateFuelCost, suggestPricePerSeat } from '@/hooks/useRides';
 import LocationMapPicker from '@/components/LocationMapPicker';
 
 const ProposeRide = () => {
@@ -19,7 +19,13 @@ const ProposeRide = () => {
   const { createRide } = useRides();
   
   const [submitting, setSubmitting] = useState(false);
-  const [fuelEstimate, setFuelEstimate] = useState<number | null>(null);
+  const [priceEstimate, setPriceEstimate] = useState<{
+    fuelCost: number;
+    min: number;
+    suggested: number;
+    max: number;
+    distance: number;
+  } | null>(null);
   const [showDepartureMap, setShowDepartureMap] = useState(false);
   const [showArrivalMap, setShowArrivalMap] = useState(false);
   
@@ -45,29 +51,21 @@ const ProposeRide = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    // Calculate fuel cost estimation
-    const departure = formData.departure_city.toLowerCase().trim();
-    const arrival = formData.arrival_city.toLowerCase().trim();
-    
-    // Find matching cities
-    let distance: number | null = null;
-    for (const [city, destinations] of Object.entries(beninDistances)) {
-      if (departure.includes(city.toLowerCase())) {
-        for (const [dest, dist] of Object.entries(destinations)) {
-          if (arrival.includes(dest.toLowerCase())) {
-            distance = dist;
-            break;
-          }
-        }
-      }
-    }
+    const distance = getDistance(formData.departure_city, formData.arrival_city);
+    const seats = parseInt(formData.total_seats) || 4;
     
     if (distance) {
-      setFuelEstimate(estimateFuelCost(distance));
+      const fuelCost = estimateFuelCost(distance);
+      const prices = suggestPricePerSeat(distance, seats);
+      setPriceEstimate({
+        fuelCost,
+        ...prices,
+        distance,
+      });
     } else {
-      setFuelEstimate(null);
+      setPriceEstimate(null);
     }
-  }, [formData.departure_city, formData.arrival_city]);
+  }, [formData.departure_city, formData.arrival_city, formData.total_seats]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -232,14 +230,32 @@ const ProposeRide = () => {
                   </div>
                 </div>
                 
-                {/* Fuel Estimate */}
-                {fuelEstimate && (
-                  <div className="bg-muted rounded-lg p-3 flex items-center gap-3">
-                    <Fuel className="w-5 h-5 text-primary" />
-                    <p className="text-sm">
-                      <span className="text-muted-foreground">Estimation carburant : </span>
-                      <span className="font-semibold text-foreground">{fuelEstimate.toLocaleString()} FCFA</span>
-                      <span className="text-muted-foreground"> (à diviser par passager)</span>
+                {/* Price Estimate */}
+                {priceEstimate && (
+                  <div className="bg-muted rounded-lg p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <Fuel className="w-4 h-4 text-primary" />
+                      Estimation pour {priceEstimate.distance} km
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-center">
+                      <div className="bg-background rounded-lg p-2">
+                        <p className="text-xs text-muted-foreground">Minimum</p>
+                        <p className="font-semibold text-foreground">{priceEstimate.min.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">FCFA</p>
+                      </div>
+                      <div className="bg-primary/10 border border-primary/20 rounded-lg p-2">
+                        <p className="text-xs text-primary">Suggéré</p>
+                        <p className="font-bold text-primary">{priceEstimate.suggested.toLocaleString()}</p>
+                        <p className="text-xs text-primary">FCFA</p>
+                      </div>
+                      <div className="bg-background rounded-lg p-2">
+                        <p className="text-xs text-muted-foreground">Maximum</p>
+                        <p className="font-semibold text-foreground">{priceEstimate.max.toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">FCFA</p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">
+                      Carburant estimé : {priceEstimate.fuelCost.toLocaleString()} FCFA
                     </p>
                   </div>
                 )}
