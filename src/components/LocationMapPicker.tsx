@@ -1,9 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import { useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import { Icon, LatLng } from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { MapPin, X } from 'lucide-react';
 import { Button } from './ui/button';
-import { supabase } from '@/integrations/supabase/client';
+
+// Fix for default marker icon
+const defaultIcon = new Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
 
 interface LocationMapPickerProps {
   onSelectLocation: (location: { name: string; lat: number; lng: number }) => void;
@@ -12,93 +23,54 @@ interface LocationMapPickerProps {
   title: string;
 }
 
+interface MapClickHandlerProps {
+  onLocationSelect: (lat: number, lng: number) => void;
+}
+
+const MapClickHandler = ({ onLocationSelect }: MapClickHandlerProps) => {
+  useMapEvents({
+    click: (e) => {
+      onLocationSelect(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+};
+
 const LocationMapPicker = ({ onSelectLocation, onClose, initialCenter, title }: LocationMapPickerProps) => {
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const map = useRef<mapboxgl.Map | null>(null);
-  const marker = useRef<mapboxgl.Marker | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [markerPosition, setMarkerPosition] = useState<LatLng | null>(null);
+  const [isGeocoding, setIsGeocoding] = useState(false);
 
-  useEffect(() => {
-    const initMap = async () => {
-      if (!mapContainer.current) return;
+  // Center on Benin by default
+  const center: [number, number] = initialCenter || [6.3703, 2.3158];
 
-      try {
-        // Fetch Mapbox token from edge function
-        const { data, error: fetchError } = await supabase.functions.invoke('get-mapbox-token');
-        
-        if (fetchError || !data?.token) {
-          setError('Impossible de charger la carte. Vérifiez la configuration Mapbox.');
-          setLoading(false);
-          return;
-        }
+  const handleLocationSelect = async (lat: number, lng: number) => {
+    setMarkerPosition(new LatLng(lat, lng));
+    setIsGeocoding(true);
 
-        mapboxgl.accessToken = data.token;
-
-        // Center on Benin by default
-        const center: [number, number] = initialCenter || [2.3158, 6.3703];
-
-        map.current = new mapboxgl.Map({
-          container: mapContainer.current,
-          style: 'mapbox://styles/mapbox/streets-v12',
-          center: center,
-          zoom: 7,
-        });
-
-        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
-
-        // Add click handler
-        map.current.on('click', async (e) => {
-          const { lng, lat } = e.lngLat;
-          
-          // Update or create marker
-          if (marker.current) {
-            marker.current.setLngLat([lng, lat]);
-          } else {
-            marker.current = new mapboxgl.Marker({ color: '#22c55e' })
-              .setLngLat([lng, lat])
-              .addTo(map.current!);
-          }
-
-          // Reverse geocode to get location name
-          try {
-            const response = await fetch(
-              `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?access_token=${data.token}&language=fr`
-            );
-            const geoData = await response.json();
-            const placeName = geoData.features?.[0]?.place_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-            
-            setSelectedLocation({
-              name: placeName,
-              lat,
-              lng
-            });
-          } catch {
-            setSelectedLocation({
-              name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-              lat,
-              lng
-            });
-          }
-        });
-
-        map.current.on('load', () => {
-          setLoading(false);
-        });
-
-      } catch (err) {
-        setError('Erreur lors du chargement de la carte');
-        setLoading(false);
-      }
-    };
-
-    initMap();
-
-    return () => {
-      map.current?.remove();
-    };
-  }, [initialCenter]);
+    try {
+      // Use Nominatim (OpenStreetMap) for reverse geocoding - free, no API key
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=fr`
+      );
+      const data = await response.json();
+      const placeName = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      
+      setSelectedLocation({
+        name: placeName,
+        lat,
+        lng
+      });
+    } catch {
+      setSelectedLocation({
+        name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+        lat,
+        lng
+      });
+    } finally {
+      setIsGeocoding(false);
+    }
+  };
 
   const handleConfirm = () => {
     if (selectedLocation) {
@@ -122,22 +94,30 @@ const LocationMapPicker = ({ onSelectLocation, onClose, initialCenter, title }: 
 
         {/* Map container */}
         <div className="relative h-[400px]">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          )}
-          {error && (
-            <div className="absolute inset-0 flex items-center justify-center bg-muted">
-              <p className="text-destructive text-center px-4">{error}</p>
-            </div>
-          )}
-          <div ref={mapContainer} className="w-full h-full" />
+          <MapContainer
+            center={center}
+            zoom={7}
+            style={{ height: '100%', width: '100%' }}
+            scrollWheelZoom={true}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <MapClickHandler onLocationSelect={handleLocationSelect} />
+            {markerPosition && (
+              <Marker position={markerPosition} icon={defaultIcon} />
+            )}
+          </MapContainer>
         </div>
 
         {/* Selected location & actions */}
         <div className="p-4 border-t border-border space-y-3">
-          {selectedLocation ? (
+          {isGeocoding ? (
+            <p className="text-sm text-muted-foreground">
+              Chargement de l'adresse...
+            </p>
+          ) : selectedLocation ? (
             <p className="text-sm text-muted-foreground truncate">
               <span className="font-medium text-foreground">Sélectionné:</span> {selectedLocation.name}
             </p>
@@ -153,7 +133,7 @@ const LocationMapPicker = ({ onSelectLocation, onClose, initialCenter, title }: 
             </Button>
             <Button 
               onClick={handleConfirm} 
-              disabled={!selectedLocation}
+              disabled={!selectedLocation || isGeocoding}
               className="flex-1"
             >
               Confirmer
