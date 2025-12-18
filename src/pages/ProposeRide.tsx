@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Users, Car, CreditCard, ArrowRight, Fuel } from 'lucide-react';
+import { MapPin, Calendar, Clock, Users, Car, CreditCard, ArrowRight, Fuel, Map } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
 import { useRides, estimateFuelCost, beninDistances } from '@/hooks/useRides';
+import LocationMapPicker from '@/components/LocationMapPicker';
 
 const ProposeRide = () => {
   const navigate = useNavigate();
@@ -19,6 +20,8 @@ const ProposeRide = () => {
   
   const [submitting, setSubmitting] = useState(false);
   const [fuelEstimate, setFuelEstimate] = useState<number | null>(null);
+  const [showDepartureMap, setShowDepartureMap] = useState(false);
+  const [showArrivalMap, setShowArrivalMap] = useState(false);
   
   const [formData, setFormData] = useState({
     departure_city: '',
@@ -165,23 +168,47 @@ const ProposeRide = () => {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="departure_city">Ville de départ *</Label>
-                    <Input
-                      id="departure_city"
-                      name="departure_city"
-                      placeholder="Ex: Cotonou"
-                      value={formData.departure_city}
-                      onChange={handleChange}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="departure_city"
+                        name="departure_city"
+                        placeholder="Ex: Cotonou"
+                        value={formData.departure_city}
+                        onChange={handleChange}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowDepartureMap(true)}
+                        title="Sélectionner sur la carte"
+                      >
+                        <Map className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="arrival_city">Ville d'arrivée *</Label>
-                    <Input
-                      id="arrival_city"
-                      name="arrival_city"
-                      placeholder="Ex: Porto-Novo"
-                      value={formData.arrival_city}
-                      onChange={handleChange}
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        id="arrival_city"
+                        name="arrival_city"
+                        placeholder="Ex: Porto-Novo"
+                        value={formData.arrival_city}
+                        onChange={handleChange}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => setShowArrivalMap(true)}
+                        title="Sélectionner sur la carte"
+                      >
+                        <Map className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="departure_address">Adresse de départ (optionnel)</Label>
@@ -366,6 +393,39 @@ const ProposeRide = () => {
       </main>
 
       <Footer />
+
+      {/* Map Pickers */}
+      {showDepartureMap && (
+        <LocationMapPicker
+          title="Sélectionner le point de départ"
+          onSelectLocation={(location) => {
+            const cityName = location.name.split(',')[0];
+            setFormData(prev => ({
+              ...prev,
+              departure_city: cityName,
+              departure_address: location.name
+            }));
+            setShowDepartureMap(false);
+          }}
+          onClose={() => setShowDepartureMap(false)}
+        />
+      )}
+
+      {showArrivalMap && (
+        <LocationMapPicker
+          title="Sélectionner le point d'arrivée"
+          onSelectLocation={(location) => {
+            const cityName = location.name.split(',')[0];
+            setFormData(prev => ({
+              ...prev,
+              arrival_city: cityName,
+              arrival_address: location.name
+            }));
+            setShowArrivalMap(false);
+          }}
+          onClose={() => setShowArrivalMap(false)}
+        />
+      )}
     </div>
   );
 };
