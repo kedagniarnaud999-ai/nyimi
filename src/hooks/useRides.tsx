@@ -141,33 +141,139 @@ export const useRides = () => {
   };
 };
 
+// Constants for price calculation
+const FUEL_PRICE_PER_LITER = 650; // FCFA per liter in Benin (2024)
+const AVERAGE_CONSUMPTION = 8; // liters per 100km for typical car
+const VEHICLE_WEAR_PER_KM = 15; // FCFA per km (maintenance, tires, etc.)
+const TOLL_FEE_PER_100KM = 200; // FCFA average toll cost
+
 // Fuel cost estimation based on distance
 export const estimateFuelCost = (distanceKm: number): number => {
-  const fuelPricePerLiter = 650; // FCFA per liter in Benin
-  const averageConsumption = 8; // liters per 100km
-  const litersNeeded = (distanceKm * averageConsumption) / 100;
-  return Math.round(litersNeeded * fuelPricePerLiter);
+  const litersNeeded = (distanceKm * AVERAGE_CONSUMPTION) / 100;
+  return Math.round(litersNeeded * FUEL_PRICE_PER_LITER);
 };
 
-// Common distances in Benin (in km)
+// Full cost estimation (fuel + wear + tolls)
+export const estimateTotalCost = (distanceKm: number): number => {
+  const fuelCost = estimateFuelCost(distanceKm);
+  const wearCost = distanceKm * VEHICLE_WEAR_PER_KM;
+  const tollCost = (distanceKm / 100) * TOLL_FEE_PER_100KM;
+  return Math.round(fuelCost + wearCost + tollCost);
+};
+
+// Suggested price per seat (cost split + driver margin)
+export const suggestPricePerSeat = (distanceKm: number, totalSeats: number = 4): { min: number; suggested: number; max: number } => {
+  const totalCost = estimateTotalCost(distanceKm);
+  const costPerSeat = totalCost / totalSeats;
+  
+  // Round to nearest 100 FCFA for cleaner prices
+  const roundTo100 = (n: number) => Math.round(n / 100) * 100;
+  
+  return {
+    min: roundTo100(costPerSeat), // Break-even price
+    suggested: roundTo100(costPerSeat * 1.3), // 30% margin
+    max: roundTo100(costPerSeat * 1.6), // 60% margin for premium service
+  };
+};
+
+// Get distance between two cities (bidirectional lookup)
+export const getDistance = (from: string, to: string): number | null => {
+  const normalizedFrom = from.trim();
+  const normalizedTo = to.trim();
+  
+  // Direct lookup
+  if (beninDistances[normalizedFrom]?.[normalizedTo]) {
+    return beninDistances[normalizedFrom][normalizedTo];
+  }
+  
+  // Reverse lookup
+  if (beninDistances[normalizedTo]?.[normalizedFrom]) {
+    return beninDistances[normalizedTo][normalizedFrom];
+  }
+  
+  return null;
+};
+
+// Comprehensive distances in Benin (in km) - major routes
 export const beninDistances: Record<string, Record<string, number>> = {
   'Cotonou': {
     'Porto-Novo': 35,
     'Abomey-Calavi': 18,
     'Ouidah': 42,
     'Bohicon': 120,
+    'Abomey': 135,
     'Parakou': 415,
     'Natitingou': 560,
     'Sèmè-Kpodji': 15,
+    'Lokossa': 105,
+    'Djougou': 460,
+    'Kandi': 570,
+    'Malanville': 680,
+    'Savalou': 210,
+    'Dassa-Zoumé': 200,
+    'Glazoué': 230,
+    'Tchaourou': 350,
+    'Allada': 55,
+    'Comé': 70,
+    'Grand-Popo': 85,
   },
   'Porto-Novo': {
-    'Cotonou': 35,
     'Abomey-Calavi': 50,
     'Sèmè-Kpodji': 25,
+    'Adjarra': 10,
+    'Pobè': 45,
+    'Kétou': 85,
   },
   'Parakou': {
-    'Cotonou': 415,
     'Natitingou': 150,
     'Bohicon': 295,
+    'Djougou': 135,
+    'Kandi': 160,
+    'Tchaourou': 65,
+    'Nikki': 90,
+    'Bembèrèkè': 70,
+    'N\'Dali': 25,
+  },
+  'Bohicon': {
+    'Abomey': 8,
+    'Lokossa': 75,
+    'Savalou': 90,
+    'Dassa-Zoumé': 80,
+    'Covè': 25,
+    'Zagnanado': 45,
+  },
+  'Natitingou': {
+    'Djougou': 85,
+    'Tanguiéta': 55,
+    'Boukoumbé': 45,
+    'Kouandé': 35,
+  },
+  'Lokossa': {
+    'Comé': 40,
+    'Grand-Popo': 55,
+    'Athiémé': 15,
+    'Aplahoué': 30,
+    'Dogbo': 20,
+  },
+  'Djougou': {
+    'Bassila': 65,
+    'Copargo': 25,
+    'Ouaké': 40,
+  },
+  'Kandi': {
+    'Malanville': 110,
+    'Banikoara': 50,
+    'Gogounou': 35,
+    'Ségbana': 85,
+  },
+  'Ouidah': {
+    'Grand-Popo': 45,
+    'Comé': 30,
+    'Allada': 35,
+  },
+  'Abomey-Calavi': {
+    'Allada': 25,
+    'Tori-Bossito': 35,
+    'Zè': 30,
   },
 };
