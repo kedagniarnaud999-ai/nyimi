@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import { Icon, LatLng } from 'leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { MapPin, X } from 'lucide-react';
 import { Button } from './ui/button';
 
 // Fix for default marker icon
-const defaultIcon = new Icon({
+const defaultIcon = L.icon({
   iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
@@ -38,14 +38,14 @@ const MapClickHandler = ({ onLocationSelect }: MapClickHandlerProps) => {
 
 const LocationMapPicker = ({ onSelectLocation, onClose, initialCenter, title }: LocationMapPickerProps) => {
   const [selectedLocation, setSelectedLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
-  const [markerPosition, setMarkerPosition] = useState<LatLng | null>(null);
+  const [markerPosition, setMarkerPosition] = useState<[number, number] | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
 
   // Center on Benin by default
   const center: [number, number] = initialCenter || [6.3703, 2.3158];
 
   const handleLocationSelect = async (lat: number, lng: number) => {
-    setMarkerPosition(new LatLng(lat, lng));
+    setMarkerPosition([lat, lng]);
     setIsGeocoding(true);
 
     try {
