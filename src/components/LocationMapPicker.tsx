@@ -1,19 +1,18 @@
-import { useState } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import { MapPin, X } from 'lucide-react';
-import { Button } from './ui/button';
+import { useEffect, useRef, useState } from "react";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import { MapPin, X } from "lucide-react";
+import { Button } from "./ui/button";
 
-// Fix for default marker icon
+// Fix for default marker icon (Leaflet + Vite)
 const defaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
   iconSize: [25, 41],
   iconAnchor: [12, 41],
   popupAnchor: [1, -34],
-  shadowSize: [41, 41]
+  shadowSize: [41, 41],
 });
 
 interface LocationMapPickerProps {
@@ -23,59 +22,91 @@ interface LocationMapPickerProps {
   title: string;
 }
 
-interface MapClickHandlerProps {
-  onLocationSelect: (lat: number, lng: number) => void;
-}
+const LocationMapPicker = ({
+  onSelectLocation,
+  onClose,
+  initialCenter,
+  title,
+}: LocationMapPickerProps) => {
+  const mapDivRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markerRef = useRef<L.Marker | null>(null);
 
-const MapClickHandler = ({ onLocationSelect }: MapClickHandlerProps) => {
-  useMapEvents({
-    click: (e) => {
-      onLocationSelect(e.latlng.lat, e.latlng.lng);
-    },
-  });
-  return null;
-};
-
-const LocationMapPicker = ({ onSelectLocation, onClose, initialCenter, title }: LocationMapPickerProps) => {
-  const [selectedLocation, setSelectedLocation] = useState<{ name: string; lat: number; lng: number } | null>(null);
-  const [markerPosition, setMarkerPosition] = useState<[number, number] | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<{
+    name: string;
+    lat: number;
+    lng: number;
+  } | null>(null);
   const [isGeocoding, setIsGeocoding] = useState(false);
 
   // Center on Benin by default
   const center: [number, number] = initialCenter || [6.3703, 2.3158];
 
   const handleLocationSelect = async (lat: number, lng: number) => {
-    setMarkerPosition([lat, lng]);
     setIsGeocoding(true);
 
     try {
       // Use Nominatim (OpenStreetMap) for reverse geocoding - free, no API key
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=fr`
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=fr`,
       );
       const data = await response.json();
-      const placeName = data.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-      
-      setSelectedLocation({
-        name: placeName,
-        lat,
-        lng
-      });
+      const placeName = data?.display_name || `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+
+      setSelectedLocation({ name: placeName, lat, lng });
     } catch {
-      setSelectedLocation({
-        name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`,
-        lat,
-        lng
-      });
+      setSelectedLocation({ name: `${lat.toFixed(4)}, ${lng.toFixed(4)}`, lat, lng });
     } finally {
       setIsGeocoding(false);
     }
   };
 
+  useEffect(() => {
+    if (!mapDivRef.current || mapRef.current) return;
+
+    const map = L.map(mapDivRef.current, {
+      center,
+      zoom: 7,
+      zoomControl: true,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng;
+
+      if (!markerRef.current) {
+        markerRef.current = L.marker([lat, lng], { icon: defaultIcon }).addTo(map);
+      } else {
+        markerRef.current.setLatLng([lat, lng]);
+      }
+
+      void handleLocationSelect(lat, lng);
+    });
+
+    mapRef.current = map;
+
+    return () => {
+      map.off();
+      map.remove();
+      mapRef.current = null;
+      markerRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // If initialCenter changes (rare), recenter map
+  useEffect(() => {
+    if (!mapRef.current) return;
+    mapRef.current.setView(center, mapRef.current.getZoom());
+  }, [center[0], center[1]]);
+
   const handleConfirm = () => {
-    if (selectedLocation) {
-      onSelectLocation(selectedLocation);
-    }
+    if (selectedLocation) onSelectLocation(selectedLocation);
   };
 
   return (
@@ -94,48 +125,26 @@ const LocationMapPicker = ({ onSelectLocation, onClose, initialCenter, title }: 
 
         {/* Map container */}
         <div className="relative h-[400px]">
-          <MapContainer
-            center={center}
-            zoom={7}
-            style={{ height: '100%', width: '100%' }}
-            scrollWheelZoom={true}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            <MapClickHandler onLocationSelect={handleLocationSelect} />
-            {markerPosition && (
-              <Marker position={markerPosition} icon={defaultIcon} />
-            )}
-          </MapContainer>
+          <div ref={mapDivRef} className="h-full w-full" />
         </div>
 
         {/* Selected location & actions */}
         <div className="p-4 border-t border-border space-y-3">
           {isGeocoding ? (
-            <p className="text-sm text-muted-foreground">
-              Chargement de l'adresse...
-            </p>
+            <p className="text-sm text-muted-foreground">Chargement de l'adresse...</p>
           ) : selectedLocation ? (
             <p className="text-sm text-muted-foreground truncate">
               <span className="font-medium text-foreground">Sélectionné:</span> {selectedLocation.name}
             </p>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Cliquez sur la carte pour sélectionner un emplacement
-            </p>
+            <p className="text-sm text-muted-foreground">Cliquez sur la carte pour sélectionner un emplacement</p>
           )}
-          
+
           <div className="flex gap-2">
             <Button variant="outline" onClick={onClose} className="flex-1">
               Annuler
             </Button>
-            <Button 
-              onClick={handleConfirm} 
-              disabled={!selectedLocation || isGeocoding}
-              className="flex-1"
-            >
+            <Button onClick={handleConfirm} disabled={!selectedLocation || isGeocoding} className="flex-1">
               Confirmer
             </Button>
           </div>
