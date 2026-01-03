@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { useRides, getDistance, estimateFuelCost, suggestPricePerSeat, validatePrice } from '@/hooks/useRides';
+import { useRides, getDistance, estimateFuelCost, suggestPricePerSeat, validatePrice, calculateDistanceFromCoords } from '@/hooks/useRides';
 import LocationMapPicker from '@/components/LocationMapPicker';
 
 const ProposeRide = () => {
@@ -25,10 +25,13 @@ const ProposeRide = () => {
     suggested: number;
     max: number;
     distance: number;
+    totalCost: number;
   } | null>(null);
   const [priceWarning, setPriceWarning] = useState<string | null>(null);
   const [showDepartureMap, setShowDepartureMap] = useState(false);
   const [showArrivalMap, setShowArrivalMap] = useState(false);
+  const [departureCoords, setDepartureCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [arrivalCoords, setArrivalCoords] = useState<{ lat: number; lng: number } | null>(null);
   
   const [formData, setFormData] = useState({
     departure_city: '',
@@ -52,21 +55,34 @@ const ProposeRide = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    const distance = getDistance(formData.departure_city, formData.arrival_city);
+    // Try to get distance from predefined cities first
+    let distance = getDistance(formData.departure_city, formData.arrival_city);
+    
+    // If not found and we have coordinates, calculate from coords
+    if (!distance && departureCoords && arrivalCoords) {
+      distance = calculateDistanceFromCoords(
+        departureCoords.lat, departureCoords.lng,
+        arrivalCoords.lat, arrivalCoords.lng
+      );
+    }
+    
     const seats = parseInt(formData.total_seats) || 4;
     
-    if (distance) {
+    if (distance && distance > 0) {
       const fuelCost = estimateFuelCost(distance);
       const prices = suggestPricePerSeat(distance, seats);
       setPriceEstimate({
         fuelCost,
-        ...prices,
+        min: prices.min,
+        suggested: prices.suggested,
+        max: prices.max,
         distance,
+        totalCost: prices.totalCost,
       });
     } else {
       setPriceEstimate(null);
     }
-  }, [formData.departure_city, formData.arrival_city, formData.total_seats]);
+  }, [formData.departure_city, formData.arrival_city, formData.total_seats, departureCoords, arrivalCoords]);
 
   // Validate price when it changes
   useEffect(() => {
@@ -280,7 +296,7 @@ const ProposeRide = () => {
                       Appliquer le prix suggéré ({priceEstimate.suggested.toLocaleString()} FCFA)
                     </Button>
                     <p className="text-xs text-muted-foreground text-center">
-                      Coût total estimé : {priceEstimate.fuelCost.toLocaleString()} FCFA (carburant + usure + péages) — partagé entre les passagers
+                      Coût total du trajet : {priceEstimate.totalCost.toLocaleString()} FCFA — Plus il y a de passagers, moins chacun paie !
                     </p>
                   </div>
                 )}
@@ -451,6 +467,7 @@ const ProposeRide = () => {
               departure_city: cityName,
               departure_address: location.name
             }));
+            setDepartureCoords({ lat: location.lat, lng: location.lng });
             setShowDepartureMap(false);
           }}
           onClose={() => setShowDepartureMap(false)}
@@ -467,6 +484,7 @@ const ProposeRide = () => {
               arrival_city: cityName,
               arrival_address: location.name
             }));
+            setArrivalCoords({ lat: location.lat, lng: location.lng });
             setShowArrivalMap(false);
           }}
           onClose={() => setShowArrivalMap(false)}
