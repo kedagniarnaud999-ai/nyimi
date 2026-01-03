@@ -161,19 +161,41 @@ export const estimateTotalCost = (distanceKm: number): number => {
   return Math.round(fuelCost + wearCost + tollCost);
 };
 
-// Suggested price per seat (cost split + driver margin)
+// Suggested price per seat
+// The fuel cost is FIXED for the trip and shared equally among confirmed passengers
+// Alone = full cost; with others = each pays an average share
 export const suggestPricePerSeat = (distanceKm: number, totalSeats: number = 4): { min: number; suggested: number; max: number } => {
   const totalCost = estimateTotalCost(distanceKm);
-  const costPerSeat = totalCost / totalSeats;
+  
+  // The price per seat is based on sharing the total trip cost
+  // totalSeats = max passengers (excluding driver)
+  // If all seats filled, each passenger pays totalCost / totalSeats
+  const costPerSeatFull = totalCost / totalSeats;
   
   // Round to nearest 100 FCFA for cleaner prices
   const roundTo100 = (n: number) => Math.round(n / 100) * 100;
   
   return {
-    min: roundTo100(costPerSeat), // Break-even price
-    suggested: roundTo100(costPerSeat * 1.3), // 30% margin
-    max: roundTo100(costPerSeat * 1.6), // 60% margin for premium service
+    min: roundTo100(costPerSeatFull), // Cost when all seats are filled (break-even)
+    suggested: roundTo100(costPerSeatFull * 1.2), // 20% buffer for partially filled rides
+    max: roundTo100(costPerSeatFull * 1.5), // 50% margin max
   };
+};
+
+// Check if a price is within acceptable range
+export const validatePrice = (price: number, suggested: number): { isValid: boolean; warning: string | null } => {
+  const deviation = Math.abs(price - suggested) / suggested;
+  
+  if (price < suggested * 0.5) {
+    return { isValid: true, warning: 'Prix très bas - vous risquez de ne pas couvrir vos frais' };
+  }
+  if (price > suggested * 2) {
+    return { isValid: true, warning: 'Prix élevé - les passagers pourraient préférer d\'autres trajets' };
+  }
+  if (deviation > 0.3) {
+    return { isValid: true, warning: 'Prix différent du suggéré - vérifiez que c\'est intentionnel' };
+  }
+  return { isValid: true, warning: null };
 };
 
 // Get distance between two cities (bidirectional lookup)
