@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { useRides, getDistance, estimateFuelCost, suggestPricePerSeat } from '@/hooks/useRides';
+import { useRides, getDistance, estimateFuelCost, suggestPricePerSeat, validatePrice } from '@/hooks/useRides';
 import LocationMapPicker from '@/components/LocationMapPicker';
 
 const ProposeRide = () => {
@@ -26,6 +26,7 @@ const ProposeRide = () => {
     max: number;
     distance: number;
   } | null>(null);
+  const [priceWarning, setPriceWarning] = useState<string | null>(null);
   const [showDepartureMap, setShowDepartureMap] = useState(false);
   const [showArrivalMap, setShowArrivalMap] = useState(false);
   
@@ -66,6 +67,17 @@ const ProposeRide = () => {
       setPriceEstimate(null);
     }
   }, [formData.departure_city, formData.arrival_city, formData.total_seats]);
+
+  // Validate price when it changes
+  useEffect(() => {
+    if (priceEstimate && formData.price) {
+      const price = parseInt(formData.price);
+      const { warning } = validatePrice(price, priceEstimate.suggested);
+      setPriceWarning(warning);
+    } else {
+      setPriceWarning(null);
+    }
+  }, [formData.price, priceEstimate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -243,7 +255,11 @@ const ProposeRide = () => {
                         <p className="font-semibold text-foreground">{priceEstimate.min.toLocaleString()}</p>
                         <p className="text-xs text-muted-foreground">FCFA</p>
                       </div>
-                      <div className="bg-primary/10 border border-primary/20 rounded-lg p-2">
+                      <div 
+                        className="bg-primary/10 border border-primary/20 rounded-lg p-2 cursor-pointer hover:bg-primary/20 transition-colors"
+                        onClick={() => setFormData(prev => ({ ...prev, price: priceEstimate.suggested.toString() }))}
+                        title="Cliquer pour appliquer ce prix"
+                      >
                         <p className="text-xs text-primary">Suggéré</p>
                         <p className="font-bold text-primary">{priceEstimate.suggested.toLocaleString()}</p>
                         <p className="text-xs text-primary">FCFA</p>
@@ -254,8 +270,17 @@ const ProposeRide = () => {
                         <p className="text-xs text-muted-foreground">FCFA</p>
                       </div>
                     </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => setFormData(prev => ({ ...prev, price: priceEstimate.suggested.toString() }))}
+                    >
+                      Appliquer le prix suggéré ({priceEstimate.suggested.toLocaleString()} FCFA)
+                    </Button>
                     <p className="text-xs text-muted-foreground text-center">
-                      Carburant estimé : {priceEstimate.fuelCost.toLocaleString()} FCFA
+                      Coût total estimé : {priceEstimate.fuelCost.toLocaleString()} FCFA (carburant + usure + péages) — partagé entre les passagers
                     </p>
                   </div>
                 )}
@@ -336,9 +361,14 @@ const ProposeRide = () => {
                         placeholder="Ex: 500"
                         value={formData.price}
                         onChange={handleChange}
-                        className="pl-10"
+                        className={`pl-10 ${priceWarning ? 'border-amber-500 focus-visible:ring-amber-500' : ''}`}
                       />
                     </div>
+                    {priceWarning && (
+                      <p className="text-xs text-amber-600 flex items-center gap-1">
+                        ⚠️ {priceWarning}
+                      </p>
+                    )}
                   </div>
                 </div>
                 
