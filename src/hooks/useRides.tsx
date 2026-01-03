@@ -162,24 +162,48 @@ export const estimateTotalCost = (distanceKm: number): number => {
 };
 
 // Suggested price per seat
-// The fuel cost is FIXED for the trip and shared equally among confirmed passengers
-// Alone = full cost; with others = each pays an average share
-export const suggestPricePerSeat = (distanceKm: number, totalSeats: number = 4): { min: number; suggested: number; max: number } => {
+// Le coût total du trajet est FIXE et partagé équitablement entre les passagers
+// Plus il y a de passagers, moins chacun paie (économie de partage)
+export const suggestPricePerSeat = (distanceKm: number, totalSeats: number = 4): { min: number; suggested: number; max: number; totalCost: number } => {
   const totalCost = estimateTotalCost(distanceKm);
   
-  // The price per seat is based on sharing the total trip cost
-  // totalSeats = max passengers (excluding driver)
-  // If all seats filled, each passenger pays totalCost / totalSeats
-  const costPerSeatFull = totalCost / totalSeats;
+  // Prix basé sur un remplissage moyen (2 passagers en moyenne)
+  // Cela donne un prix équilibré qui couvre les frais même si pas complet
+  const averagePassengers = Math.max(2, Math.floor(totalSeats / 2));
+  const pricePerSeat = totalCost / averagePassengers;
+  
+  // Min = prix si toutes les places sont remplies (meilleur prix pour passagers)
+  const minPricePerSeat = totalCost / totalSeats;
+  
+  // Max = prix si seulement 1 passager (couvre tous les frais)
+  const maxPricePerSeat = totalCost;
   
   // Round to nearest 100 FCFA for cleaner prices
   const roundTo100 = (n: number) => Math.round(n / 100) * 100;
   
   return {
-    min: roundTo100(costPerSeatFull), // Cost when all seats are filled (break-even)
-    suggested: roundTo100(costPerSeatFull * 1.2), // 20% buffer for partially filled rides
-    max: roundTo100(costPerSeatFull * 1.5), // 50% margin max
+    min: roundTo100(minPricePerSeat),
+    suggested: roundTo100(pricePerSeat),
+    max: roundTo100(maxPricePerSeat * 0.8), // 80% du max pour rester compétitif
+    totalCost,
   };
+};
+
+// Estimate price from coordinates distance (Haversine formula)
+export const calculateDistanceFromCoords = (
+  lat1: number, lon1: number, 
+  lat2: number, lon2: number
+): number => {
+  const R = 6371; // Earth's radius in km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  // Multiply by 1.3 to account for road distance (not straight line)
+  return Math.round(R * c * 1.3);
 };
 
 // Check if a price is within acceptable range
