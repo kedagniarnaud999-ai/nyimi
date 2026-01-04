@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Calendar, Clock, Users, Car, CreditCard, ArrowRight, Fuel, Map } from 'lucide-react';
+import { Calendar, Clock, Users, Car, CreditCard, ArrowRight, Fuel, MapPin } from 'lucide-react';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,10 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { useRides, getDistance, estimateFuelCost, suggestPricePerSeat, validatePrice, calculateDistanceFromCoords } from '@/hooks/useRides';
+import { useRides, getDistance, estimateFuelCost, suggestPricePerSeat, validatePrice, calculateDistanceFromCoords, getCityCoordinates } from '@/hooks/useRides';
 import LocationMapPicker from '@/components/LocationMapPicker';
+import CityAutocomplete from '@/components/CityAutocomplete';
+import { findCity } from '@/data/beninCities';
 
 const ProposeRide = () => {
   const navigate = useNavigate();
@@ -55,15 +57,27 @@ const ProposeRide = () => {
   }, [user, authLoading, navigate]);
 
   useEffect(() => {
-    // Try to get distance from predefined cities first
+    // Try to get distance from predefined cities first (with normalization)
     let distance = getDistance(formData.departure_city, formData.arrival_city);
     
-    // If not found and we have coordinates, calculate from coords
+    // If not found via predefined, try with stored coords
     if (!distance && departureCoords && arrivalCoords) {
       distance = calculateDistanceFromCoords(
         departureCoords.lat, departureCoords.lng,
         arrivalCoords.lat, arrivalCoords.lng
       );
+    }
+    
+    // If still no distance, try to get coords from city names (fallback GPS)
+    if (!distance && formData.departure_city && formData.arrival_city) {
+      const depCoords = getCityCoordinates(formData.departure_city);
+      const arrCoords = getCityCoordinates(formData.arrival_city);
+      if (depCoords && arrCoords) {
+        distance = calculateDistanceFromCoords(depCoords.lat, depCoords.lng, arrCoords.lat, arrCoords.lng);
+        // Mettre à jour les coords pour les futures utilisations
+        if (!departureCoords) setDepartureCoords(depCoords);
+        if (!arrivalCoords) setArrivalCoords(arrCoords);
+      }
     }
     
     const seats = parseInt(formData.total_seats) || 4;
@@ -194,47 +208,29 @@ const ProposeRide = () => {
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="departure_city">Ville de départ *</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="departure_city"
-                        name="departure_city"
-                        placeholder="Ex: Cotonou"
-                        value={formData.departure_city}
-                        onChange={handleChange}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setShowDepartureMap(true)}
-                        title="Sélectionner sur la carte"
-                      >
-                        <Map className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <CityAutocomplete
+                      value={formData.departure_city}
+                      onChange={(value, coords) => {
+                        setFormData(prev => ({ ...prev, departure_city: value }));
+                        if (coords) setDepartureCoords(coords);
+                      }}
+                      onMapClick={() => setShowDepartureMap(true)}
+                      placeholder="Ex: Cotonou"
+                      icon="primary"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="arrival_city">Ville d'arrivée *</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="arrival_city"
-                        name="arrival_city"
-                        placeholder="Ex: Porto-Novo"
-                        value={formData.arrival_city}
-                        onChange={handleChange}
-                        className="flex-1"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={() => setShowArrivalMap(true)}
-                        title="Sélectionner sur la carte"
-                      >
-                        <Map className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <CityAutocomplete
+                      value={formData.arrival_city}
+                      onChange={(value, coords) => {
+                        setFormData(prev => ({ ...prev, arrival_city: value }));
+                        if (coords) setArrivalCoords(coords);
+                      }}
+                      onMapClick={() => setShowArrivalMap(true)}
+                      placeholder="Ex: Porto-Novo"
+                      icon="secondary"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="departure_address">Adresse de départ (optionnel)</Label>
