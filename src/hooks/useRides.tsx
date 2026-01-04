@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
-
+import { findCity, getCityCoords, normalizeString } from '@/data/beninCities';
 interface RideWithDriver {
   id: string;
   departure_city: string;
@@ -222,10 +222,15 @@ export const validatePrice = (price: number, suggested: number): { isValid: bool
   return { isValid: true, warning: null };
 };
 
-// Get distance between two cities (bidirectional lookup)
+// Get distance between two cities (bidirectional lookup with normalization)
 export const getDistance = (from: string, to: string): number | null => {
-  const normalizedFrom = from.trim();
-  const normalizedTo = to.trim();
+  // D'abord, chercher dans les villes normalisées
+  const fromCity = findCity(from);
+  const toCity = findCity(to);
+  
+  // Si les deux villes sont connues, chercher la distance prédéfinie
+  const normalizedFrom = fromCity?.name || from.trim();
+  const normalizedTo = toCity?.name || to.trim();
   
   // Direct lookup
   if (beninDistances[normalizedFrom]?.[normalizedTo]) {
@@ -237,7 +242,17 @@ export const getDistance = (from: string, to: string): number | null => {
     return beninDistances[normalizedTo][normalizedFrom];
   }
   
+  // Si les deux villes sont connues mais pas de distance prédéfinie, calculer via GPS
+  if (fromCity && toCity) {
+    return calculateDistanceFromCoords(fromCity.lat, fromCity.lng, toCity.lat, toCity.lng);
+  }
+  
   return null;
+};
+
+// Get coordinates for a city (fallback GPS)
+export const getCityCoordinates = (cityName: string): { lat: number; lng: number } | null => {
+  return getCityCoords(cityName);
 };
 
 // Comprehensive distances in Benin (in km) - major routes

@@ -1,9 +1,11 @@
-import { MapPin, Calendar, Search, ArrowRight, Map } from 'lucide-react';
+import { Calendar, Search, ArrowRight } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LocationMapPicker from './LocationMapPicker';
+import CityAutocomplete from './CityAutocomplete';
+import { findCity } from '@/data/beninCities';
 
 const SearchForm = () => {
   const navigate = useNavigate();
@@ -29,48 +31,22 @@ const SearchForm = () => {
       <form onSubmit={handleSearch} className="bg-card rounded-2xl shadow-card p-4 md:p-6 space-y-4">
         <div className="grid md:grid-cols-2 gap-4">
           {/* Origin */}
-          <div className="relative flex gap-2">
-            <div className="relative flex-1">
-              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary" />
-              <Input
-                placeholder="Départ (ex: Cotonou)"
-                value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
-                className="pl-12"
-              />
-            </div>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="icon"
-              onClick={() => setShowOriginMap(true)}
-              title="Choisir sur la carte"
-            >
-              <Map className="w-4 h-4" />
-            </Button>
-          </div>
+          <CityAutocomplete
+            value={origin}
+            onChange={(value) => setOrigin(value)}
+            onMapClick={() => setShowOriginMap(true)}
+            placeholder="Départ (ex: Cotonou)"
+            icon="primary"
+          />
 
           {/* Destination */}
-          <div className="relative flex gap-2">
-            <div className="relative flex-1">
-              <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
-              <Input
-                placeholder="Destination (ex: Porto-Novo)"
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                className="pl-12"
-              />
-            </div>
-            <Button 
-              type="button" 
-              variant="outline" 
-              size="icon"
-              onClick={() => setShowDestinationMap(true)}
-              title="Choisir sur la carte"
-            >
-              <Map className="w-4 h-4" />
-            </Button>
-          </div>
+          <CityAutocomplete
+            value={destination}
+            onChange={(value) => setDestination(value)}
+            onMapClick={() => setShowDestinationMap(true)}
+            placeholder="Destination (ex: Porto-Novo)"
+            icon="secondary"
+          />
         </div>
 
         {/* Date */}
@@ -117,9 +93,9 @@ const SearchForm = () => {
         <LocationMapPicker
           title="Sélectionner le lieu de départ"
           onSelectLocation={(location) => {
-            // Extract city name from the full address
             const cityName = location.name.split(',')[0].trim();
-            setOrigin(cityName);
+            const knownCity = findCity(cityName);
+            setOrigin(knownCity?.name || cityName);
             setShowOriginMap(false);
           }}
           onClose={() => setShowOriginMap(false)}
@@ -131,7 +107,8 @@ const SearchForm = () => {
           title="Sélectionner la destination"
           onSelectLocation={(location) => {
             const cityName = location.name.split(',')[0].trim();
-            setDestination(cityName);
+            const knownCity = findCity(cityName);
+            setDestination(knownCity?.name || cityName);
             setShowDestinationMap(false);
           }}
           onClose={() => setShowDestinationMap(false)}
