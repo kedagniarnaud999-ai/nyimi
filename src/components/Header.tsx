@@ -74,7 +74,7 @@ const Header = () => {
             {user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-accent transition-colors">
+                  <Button variant="ghost" className="flex items-center gap-2 p-1.5 h-auto rounded-lg hover:bg-accent transition-colors">
                     <Avatar className="w-8 h-8">
                       <AvatarImage src={profile?.avatar_url || ''} />
                       <AvatarFallback className="bg-primary text-primary-foreground text-sm">
@@ -84,7 +84,7 @@ const Header = () => {
                     <span className="font-medium text-foreground max-w-[120px] truncate">
                       {profile?.full_name || 'Utilisateur'}
                     </span>
-                  </button>
+                  </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onClick={() => navigate('/profile')}>
