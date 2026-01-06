@@ -144,25 +144,50 @@ export const useRides = () => {
 // ============================================
 // MODÈLE DE PRIX NYÌ MÌ
 // ============================================
-// Le prix Nyì mì est basé sur le prix moyen d'un zem (moto-taxi)
+// Basé sur les tarifs zem réels au Bénin (2024)
+// - 3.2 km ≈ 250 FCFA, 4.2 km ≈ 300-350 FCFA, 42 km ≈ 2500 FCFA
 // - Distance ≤ 10 km : prix max = 66% du prix zem
 // - Distance > 10 km : prix max = 50% du prix zem
-// - Arrondi au multiple de 10 le plus proche
+// - Arrondi aux montants "faciles" (50, 100, 150...)
 // - Commission de 5-10% appliquée après le trajet
 
-// Prix zem moyen au Bénin (FCFA par km) - tarif 2024
-const ZEM_PRICE_PER_KM = 100; // Prix moyen zem par km
-const ZEM_BASE_PRICE = 150; // Prix minimum pour une course zem
+// Prix du carburant au Bénin (fluctue autour de 600 FCFA/L)
+const FUEL_PRICE_PER_LITER = 600;
+const AVERAGE_CONSUMPTION = 8; // L/100km
+
+// Tarifs zem réels calibrés sur données terrain
+// Base + tarif/km dégressif pour longues distances
+const ZEM_BASE_PRICE = 100; // Prix de base
+const ZEM_SHORT_RATE = 50;  // FCFA/km pour ≤ 10 km
+const ZEM_LONG_RATE = 55;   // FCFA/km pour > 10 km
 
 // Calcul du prix zem pour une distance donnée
 export const calculateZemPrice = (distanceKm: number): number => {
   if (distanceKm <= 0) return 0;
-  // Prix zem = base + distance * tarif/km
-  const rawPrice = ZEM_BASE_PRICE + (distanceKm * ZEM_PRICE_PER_KM);
-  return roundToNearest10(rawPrice);
+  
+  let rawPrice: number;
+  if (distanceKm <= 10) {
+    // Courte distance : base + taux court
+    rawPrice = ZEM_BASE_PRICE + (distanceKm * ZEM_SHORT_RATE);
+  } else {
+    // Longue distance : taux dégressif
+    rawPrice = ZEM_BASE_PRICE + (10 * ZEM_SHORT_RATE) + ((distanceKm - 10) * ZEM_LONG_RATE);
+  }
+  
+  return roundToEasyAmount(rawPrice);
 };
 
-// Arrondir au multiple de 10 le plus proche
+// Arrondir aux montants "faciles" (éviter 169, 120...)
+// < 500 : arrondi à 50 près
+// >= 500 : arrondi à 100 près
+const roundToEasyAmount = (n: number): number => {
+  if (n < 500) {
+    return Math.round(n / 50) * 50;
+  }
+  return Math.round(n / 100) * 100;
+};
+
+// Arrondir au multiple de 10 le plus proche (pour les petits calculs)
 const roundToNearest10 = (n: number): number => Math.round(n / 10) * 10;
 
 // Prix maximum Nyì mì autorisé selon la distance
@@ -170,21 +195,21 @@ export const calculateMaxNyimiPrice = (distanceKm: number): number => {
   const zemPrice = calculateZemPrice(distanceKm);
   // ≤ 10 km : 66% du zem, > 10 km : 50% du zem
   const percentage = distanceKm <= 10 ? 0.66 : 0.50;
-  return roundToNearest10(zemPrice * percentage);
+  return roundToEasyAmount(zemPrice * percentage);
 };
 
 // Prix suggéré Nyì mì (un peu en dessous du max pour être attractif)
 export const suggestNyimiPrice = (distanceKm: number): number => {
   const maxPrice = calculateMaxNyimiPrice(distanceKm);
   // Suggérer 85% du prix max pour être compétitif
-  return roundToNearest10(maxPrice * 0.85);
+  return roundToEasyAmount(maxPrice * 0.85);
 };
 
 // Prix minimum viable (pour couvrir un minimum de frais)
 export const calculateMinNyimiPrice = (distanceKm: number): number => {
   const maxPrice = calculateMaxNyimiPrice(distanceKm);
   // Minimum = 40% du prix max
-  return roundToNearest10(Math.max(100, maxPrice * 0.40));
+  return roundToEasyAmount(Math.max(100, maxPrice * 0.40));
 };
 
 // Calcul de la commission Nyì mì (5-10%)
@@ -220,10 +245,7 @@ export const suggestPricePerSeat = (distanceKm: number, _totalSeats: number = 4)
   };
 };
 
-// Fuel cost estimation (gardé pour référence)
-const FUEL_PRICE_PER_LITER = 650;
-const AVERAGE_CONSUMPTION = 8;
-
+// Fuel cost estimation
 export const estimateFuelCost = (distanceKm: number): number => {
   const litersNeeded = (distanceKm * AVERAGE_CONSUMPTION) / 100;
   return Math.round(litersNeeded * FUEL_PRICE_PER_LITER);
