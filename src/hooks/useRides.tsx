@@ -141,52 +141,92 @@ export const useRides = () => {
   };
 };
 
-// Constants for price calculation
-const FUEL_PRICE_PER_LITER = 650; // FCFA per liter in Benin (2024)
-const AVERAGE_CONSUMPTION = 8; // liters per 100km for typical car
-const VEHICLE_WEAR_PER_KM = 15; // FCFA per km (maintenance, tires, etc.)
-const TOLL_FEE_PER_100KM = 200; // FCFA average toll cost
+// ============================================
+// MODÈLE DE PRIX NYÌ MÌ
+// ============================================
+// Le prix Nyì mì est basé sur le prix moyen d'un zem (moto-taxi)
+// - Distance ≤ 10 km : prix max = 66% du prix zem
+// - Distance > 10 km : prix max = 50% du prix zem
+// - Arrondi au multiple de 10 le plus proche
+// - Commission de 5-10% appliquée après le trajet
 
-// Fuel cost estimation based on distance
+// Prix zem moyen au Bénin (FCFA par km) - tarif 2024
+const ZEM_PRICE_PER_KM = 100; // Prix moyen zem par km
+const ZEM_BASE_PRICE = 150; // Prix minimum pour une course zem
+
+// Calcul du prix zem pour une distance donnée
+export const calculateZemPrice = (distanceKm: number): number => {
+  if (distanceKm <= 0) return 0;
+  // Prix zem = base + distance * tarif/km
+  const rawPrice = ZEM_BASE_PRICE + (distanceKm * ZEM_PRICE_PER_KM);
+  return roundToNearest10(rawPrice);
+};
+
+// Arrondir au multiple de 10 le plus proche
+const roundToNearest10 = (n: number): number => Math.round(n / 10) * 10;
+
+// Prix maximum Nyì mì autorisé selon la distance
+export const calculateMaxNyimiPrice = (distanceKm: number): number => {
+  const zemPrice = calculateZemPrice(distanceKm);
+  // ≤ 10 km : 66% du zem, > 10 km : 50% du zem
+  const percentage = distanceKm <= 10 ? 0.66 : 0.50;
+  return roundToNearest10(zemPrice * percentage);
+};
+
+// Prix suggéré Nyì mì (un peu en dessous du max pour être attractif)
+export const suggestNyimiPrice = (distanceKm: number): number => {
+  const maxPrice = calculateMaxNyimiPrice(distanceKm);
+  // Suggérer 85% du prix max pour être compétitif
+  return roundToNearest10(maxPrice * 0.85);
+};
+
+// Prix minimum viable (pour couvrir un minimum de frais)
+export const calculateMinNyimiPrice = (distanceKm: number): number => {
+  const maxPrice = calculateMaxNyimiPrice(distanceKm);
+  // Minimum = 40% du prix max
+  return roundToNearest10(Math.max(100, maxPrice * 0.40));
+};
+
+// Calcul de la commission Nyì mì (5-10%)
+export const calculateCommission = (price: number, distanceKm: number): { rate: number; amount: number } => {
+  // 5% pour trajets > 20 km, 10% pour trajets courts
+  const rate = distanceKm > 20 ? 0.05 : 0.10;
+  const amount = roundToNearest10(price * rate);
+  return { rate, amount };
+};
+
+// Suggested price per seat avec modèle Nyì mì
+export const suggestPricePerSeat = (distanceKm: number, _totalSeats: number = 4): { 
+  min: number; 
+  suggested: number; 
+  max: number; 
+  zemPrice: number;
+  totalCost: number;
+  commission: { rate: number; amount: number };
+} => {
+  const zemPrice = calculateZemPrice(distanceKm);
+  const maxPrice = calculateMaxNyimiPrice(distanceKm);
+  const suggested = suggestNyimiPrice(distanceKm);
+  const min = calculateMinNyimiPrice(distanceKm);
+  const commission = calculateCommission(suggested, distanceKm);
+  
+  return {
+    min,
+    suggested,
+    max: maxPrice,
+    zemPrice,
+    totalCost: zemPrice, // Pour affichage comparatif
+    commission,
+  };
+};
+
+// Fuel cost estimation (gardé pour référence)
+const FUEL_PRICE_PER_LITER = 650;
+const AVERAGE_CONSUMPTION = 8;
+
 export const estimateFuelCost = (distanceKm: number): number => {
   const litersNeeded = (distanceKm * AVERAGE_CONSUMPTION) / 100;
   return Math.round(litersNeeded * FUEL_PRICE_PER_LITER);
-};
-
-// Full cost estimation (fuel + wear + tolls)
-export const estimateTotalCost = (distanceKm: number): number => {
-  const fuelCost = estimateFuelCost(distanceKm);
-  const wearCost = distanceKm * VEHICLE_WEAR_PER_KM;
-  const tollCost = (distanceKm / 100) * TOLL_FEE_PER_100KM;
-  return Math.round(fuelCost + wearCost + tollCost);
-};
-
-// Suggested price per seat
-// Le coût total du trajet est FIXE et partagé équitablement entre les passagers
-// Plus il y a de passagers, moins chacun paie (économie de partage)
-export const suggestPricePerSeat = (distanceKm: number, totalSeats: number = 4): { min: number; suggested: number; max: number; totalCost: number } => {
-  const totalCost = estimateTotalCost(distanceKm);
-  
-  // Prix basé sur un remplissage moyen (2 passagers en moyenne)
-  // Cela donne un prix équilibré qui couvre les frais même si pas complet
-  const averagePassengers = Math.max(2, Math.floor(totalSeats / 2));
-  const pricePerSeat = totalCost / averagePassengers;
-  
-  // Min = prix si toutes les places sont remplies (meilleur prix pour passagers)
-  const minPricePerSeat = totalCost / totalSeats;
-  
-  // Max = prix si seulement 1 passager (couvre tous les frais)
-  const maxPricePerSeat = totalCost;
-  
-  // Round to nearest 100 FCFA for cleaner prices
-  const roundTo100 = (n: number) => Math.round(n / 100) * 100;
-  
-  return {
-    min: roundTo100(minPricePerSeat),
-    suggested: roundTo100(pricePerSeat),
-    max: roundTo100(maxPricePerSeat * 0.8), // 80% du max pour rester compétitif
-    totalCost,
-  };
 };
 
 // Estimate price from coordinates distance (Haversine formula)
@@ -194,7 +234,7 @@ export const calculateDistanceFromCoords = (
   lat1: number, lon1: number, 
   lat2: number, lon2: number
 ): number => {
-  const R = 6371; // Earth's radius in km
+  const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a = 
@@ -202,22 +242,19 @@ export const calculateDistanceFromCoords = (
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  // Multiply by 1.3 to account for road distance (not straight line)
   return Math.round(R * c * 1.3);
 };
 
-// Check if a price is within acceptable range
-export const validatePrice = (price: number, suggested: number): { isValid: boolean; warning: string | null } => {
-  const deviation = Math.abs(price - suggested) / suggested;
-  
-  if (price < suggested * 0.5) {
-    return { isValid: true, warning: 'Prix très bas - vous risquez de ne pas couvrir vos frais' };
+// Validate price - vérifier que le prix ne dépasse pas le plafond
+export const validatePrice = (price: number, maxPrice: number): { isValid: boolean; warning: string | null } => {
+  if (price > maxPrice) {
+    return { 
+      isValid: false, 
+      warning: `Prix trop élevé ! Le plafond Nyì mì est de ${maxPrice.toLocaleString()} FCFA` 
+    };
   }
-  if (price > suggested * 2) {
-    return { isValid: true, warning: 'Prix élevé - les passagers pourraient préférer d\'autres trajets' };
-  }
-  if (deviation > 0.3) {
-    return { isValid: true, warning: 'Prix différent du suggéré - vérifiez que c\'est intentionnel' };
+  if (price < 100) {
+    return { isValid: true, warning: 'Prix très bas - assurez-vous de couvrir vos frais' };
   }
   return { isValid: true, warning: null };
 };

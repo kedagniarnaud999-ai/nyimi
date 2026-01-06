@@ -10,7 +10,7 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
-import { useRides, getDistance, estimateFuelCost, suggestPricePerSeat, validatePrice, calculateDistanceFromCoords, getCityCoordinates } from '@/hooks/useRides';
+import { useRides, getDistance, suggestPricePerSeat, validatePrice, calculateDistanceFromCoords, getCityCoordinates } from '@/hooks/useRides';
 import LocationMapPicker from '@/components/LocationMapPicker';
 import CityAutocomplete from '@/components/CityAutocomplete';
 import { findCity } from '@/data/beninCities';
@@ -22,12 +22,12 @@ const ProposeRide = () => {
   
   const [submitting, setSubmitting] = useState(false);
   const [priceEstimate, setPriceEstimate] = useState<{
-    fuelCost: number;
     min: number;
     suggested: number;
     max: number;
+    zemPrice: number;
     distance: number;
-    totalCost: number;
+    commission: { rate: number; amount: number };
   } | null>(null);
   const [priceWarning, setPriceWarning] = useState<string | null>(null);
   const [showDepartureMap, setShowDepartureMap] = useState(false);
@@ -83,15 +83,14 @@ const ProposeRide = () => {
     const seats = parseInt(formData.total_seats) || 4;
     
     if (distance && distance > 0) {
-      const fuelCost = estimateFuelCost(distance);
       const prices = suggestPricePerSeat(distance, seats);
       setPriceEstimate({
-        fuelCost,
         min: prices.min,
         suggested: prices.suggested,
         max: prices.max,
+        zemPrice: prices.zemPrice,
         distance,
-        totalCost: prices.totalCost,
+        commission: prices.commission,
       });
     } else {
       setPriceEstimate(null);
@@ -102,7 +101,7 @@ const ProposeRide = () => {
   useEffect(() => {
     if (priceEstimate && formData.price) {
       const price = parseInt(formData.price);
-      const { warning } = validatePrice(price, priceEstimate.suggested);
+      const { warning } = validatePrice(price, priceEstimate.max);
       setPriceWarning(warning);
     } else {
       setPriceWarning(null);
@@ -257,11 +256,26 @@ const ProposeRide = () => {
                 {/* Price Estimate */}
                 {priceEstimate && (
                   <div className="bg-muted rounded-lg p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                      <Fuel className="w-4 h-4 text-primary" />
-                      Estimation pour {priceEstimate.distance} km
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <Fuel className="w-4 h-4 text-primary" />
+                        Estimation pour {priceEstimate.distance} km
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Prix zem : {priceEstimate.zemPrice.toLocaleString()} FCFA
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 text-center">
+                    
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+                      <p className="text-xs text-muted-foreground mb-1">
+                        {priceEstimate.distance <= 10 ? 'Trajet court (≤10 km) : max 66% du zem' : 'Trajet long (>10 km) : max 50% du zem'}
+                      </p>
+                      <p className="text-lg font-bold text-primary">
+                        Prix max autorisé : {priceEstimate.max.toLocaleString()} FCFA
+                      </p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 text-center">
                       <div className="bg-background rounded-lg p-2">
                         <p className="text-xs text-muted-foreground">Minimum</p>
                         <p className="font-semibold text-foreground">{priceEstimate.min.toLocaleString()}</p>
@@ -276,12 +290,8 @@ const ProposeRide = () => {
                         <p className="font-bold text-primary">{priceEstimate.suggested.toLocaleString()}</p>
                         <p className="text-xs text-primary">FCFA</p>
                       </div>
-                      <div className="bg-background rounded-lg p-2">
-                        <p className="text-xs text-muted-foreground">Maximum</p>
-                        <p className="font-semibold text-foreground">{priceEstimate.max.toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">FCFA</p>
-                      </div>
                     </div>
+                    
                     <Button 
                       type="button" 
                       variant="outline" 
@@ -291,8 +301,9 @@ const ProposeRide = () => {
                     >
                       Appliquer le prix suggéré ({priceEstimate.suggested.toLocaleString()} FCFA)
                     </Button>
+                    
                     <p className="text-xs text-muted-foreground text-center">
-                      Coût total du trajet : {priceEstimate.totalCost.toLocaleString()} FCFA — Plus il y a de passagers, moins chacun paie !
+                      💡 Commission Nyì mì : {(priceEstimate.commission.rate * 100).toFixed(0)}% prélevée après le trajet
                     </p>
                   </div>
                 )}
