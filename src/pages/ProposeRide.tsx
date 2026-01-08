@@ -130,6 +130,12 @@ const ProposeRide = () => {
       return;
     }
 
+    // Validation du plafond Nyì mì
+    if (priceEstimate && parseInt(formData.price) > priceEstimate.max) {
+      toast.error(`Prix trop élevé ! Le plafond Nyì mì est de ${priceEstimate.max.toLocaleString()} FCFA`);
+      return;
+    }
+
     if (!profile?.is_driver) {
       toast.error('Vous devez activer le mode conducteur dans votre profil');
       navigate('/profile');
