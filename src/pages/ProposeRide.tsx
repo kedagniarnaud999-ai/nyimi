@@ -49,12 +49,31 @@ const ProposeRide = () => {
     allows_smoking: false,
   });
 
+  // Configuration des places max selon le type de véhicule
+  const vehicleSeatsConfig = {
+    moto: { max: 1, default: 1 },
+    voiture: { max: 4, default: 3 },
+    minibus: { max: 8, default: 6 },
+  };
+
+  const vehicleType = profile?.vehicle_type;
+  const maxSeats = vehicleType ? vehicleSeatsConfig[vehicleType].max : 4;
+  const defaultSeats = vehicleType ? vehicleSeatsConfig[vehicleType].default : 3;
+
   useEffect(() => {
     if (!authLoading && !user) {
       toast.error('Vous devez être connecté pour proposer un trajet');
       navigate('/auth');
     }
   }, [user, authLoading, navigate]);
+
+  // Auto-définir le nombre de places selon le type de véhicule
+  useEffect(() => {
+    if (profile?.vehicle_type && !formData.total_seats) {
+      const seats = vehicleSeatsConfig[profile.vehicle_type].default;
+      setFormData(prev => ({ ...prev, total_seats: seats.toString() }));
+    }
+  }, [profile?.vehicle_type]);
 
   useEffect(() => {
     // Try to get distance from predefined cities first (with normalization)
@@ -360,9 +379,48 @@ const ProposeRide = () => {
                   <Car className="w-5 h-5 text-primary" />
                   Places et préférences
                 </h2>
+                
+                {/* Affichage du type de véhicule */}
+                {vehicleType && (
+                  <div className="bg-muted rounded-lg p-3 flex items-center gap-3">
+                    <span className="text-2xl">
+                      {vehicleType === 'moto' ? '🏍️' : vehicleType === 'voiture' ? '🚗' : '🚐'}
+                    </span>
+                    <div>
+                      <p className="font-medium text-foreground">
+                        {vehicleType === 'moto' ? 'Moto' : vehicleType === 'voiture' ? 'Voiture' : 'Minibus'}
+                        {profile?.vehicle_brand && profile?.vehicle_model && (
+                          <span className="text-muted-foreground font-normal">
+                            {' '}— {profile.vehicle_brand} {profile.vehicle_model}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {maxSeats} place{maxSeats > 1 ? 's' : ''} maximum disponible{maxSeats > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {!vehicleType && profile?.is_driver && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                    <p className="text-sm text-amber-800">
+                      ⚠️ Veuillez définir votre type de véhicule dans{' '}
+                      <button onClick={() => navigate('/profile')} className="underline font-medium">
+                        votre profil
+                      </button>
+                    </p>
+                  </div>
+                )}
+                
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="total_seats">Nombre de places *</Label>
+                    <Label htmlFor="total_seats">
+                      Nombre de places *
+                      {vehicleType === 'moto' && (
+                        <span className="text-xs text-muted-foreground ml-2">(fixé à 1 pour moto)</span>
+                      )}
+                    </Label>
                     <div className="relative">
                       <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                       <Input
@@ -370,11 +428,20 @@ const ProposeRide = () => {
                         id="total_seats"
                         name="total_seats"
                         min="1"
-                        max="8"
-                        placeholder="Ex: 3"
+                        max={maxSeats}
+                        placeholder={`1-${maxSeats}`}
                         value={formData.total_seats}
-                        onChange={handleChange}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          if (val <= maxSeats) {
+                            setFormData(prev => ({ ...prev, total_seats: e.target.value }));
+                          } else {
+                            setFormData(prev => ({ ...prev, total_seats: maxSeats.toString() }));
+                            toast.info(`Maximum ${maxSeats} place${maxSeats > 1 ? 's' : ''} pour ce type de véhicule`);
+                          }
+                        }}
                         className="pl-10"
+                        disabled={vehicleType === 'moto'}
                       />
                     </div>
                   </div>

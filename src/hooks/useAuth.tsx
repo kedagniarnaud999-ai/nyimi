@@ -10,6 +10,7 @@ interface Profile {
   avatar_url: string | null;
   bio: string | null;
   is_driver: boolean;
+  vehicle_type: 'moto' | 'voiture' | 'minibus' | null;
   vehicle_brand: string | null;
   vehicle_model: string | null;
   vehicle_color: string | null;
