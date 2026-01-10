@@ -131,6 +131,17 @@ const ProposeRide = () => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  // Conditions de blocage du formulaire
+  const isPriceExceeded = priceEstimate && parseInt(formData.price) > priceEstimate.max;
+  const isVehicleNotConfigured = profile?.is_driver && !profile?.vehicle_type;
+  const isDriverModeOff = !profile?.is_driver;
+  const isFormBlocked = isPriceExceeded || isVehicleNotConfigured || isDriverModeOff || submitting;
+
+  // Calcul des gains nets (prix - commission)
+  const netEarnings = priceEstimate && formData.price
+    ? parseInt(formData.price) - Math.round(parseInt(formData.price) * priceEstimate.commission.rate)
+    : null;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -150,13 +161,19 @@ const ProposeRide = () => {
     }
 
     // Validation du plafond Nyì mì
-    if (priceEstimate && parseInt(formData.price) > priceEstimate.max) {
-      toast.error(`Prix trop élevé ! Le plafond Nyì mì est de ${priceEstimate.max.toLocaleString()} FCFA`);
+    if (isPriceExceeded) {
+      toast.error(`Prix trop élevé ! Le plafond Nyì mì est de ${priceEstimate!.max.toLocaleString()} FCFA`);
       return;
     }
 
-    if (!profile?.is_driver) {
+    if (isDriverModeOff) {
       toast.error('Vous devez activer le mode conducteur dans votre profil');
+      navigate('/profile');
+      return;
+    }
+
+    if (isVehicleNotConfigured) {
+      toast.error('Vous devez configurer votre type de véhicule dans votre profil');
       navigate('/profile');
       return;
     }
@@ -327,9 +344,19 @@ const ProposeRide = () => {
                       Appliquer le prix suggéré ({priceEstimate.suggested.toLocaleString()} FCFA)
                     </Button>
                     
-                    <p className="text-xs text-muted-foreground text-center">
-                      💡 Commission Nyì mì : {(priceEstimate.commission.rate * 100).toFixed(0)}% prélevée après le trajet
-                    </p>
+                    <div className="bg-background border border-border rounded-lg p-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        💡 Commission Nyì mì : {(priceEstimate.commission.rate * 100).toFixed(0)}% prélevée après le trajet
+                      </p>
+                      {netEarnings && (
+                        <div className="flex items-center justify-between pt-2 border-t border-border">
+                          <span className="text-sm font-medium text-foreground">Vous recevrez :</span>
+                          <span className="text-lg font-bold text-green-600">
+                            {netEarnings.toLocaleString()} FCFA
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -457,12 +484,22 @@ const ProposeRide = () => {
                         placeholder="Ex: 500"
                         value={formData.price}
                         onChange={handleChange}
-                        className={`pl-10 ${priceWarning ? 'border-amber-500 focus-visible:ring-amber-500' : ''}`}
+                        className={`pl-10 ${isPriceExceeded ? 'border-destructive focus-visible:ring-destructive' : priceWarning ? 'border-amber-500 focus-visible:ring-amber-500' : ''}`}
                       />
                     </div>
-                    {priceWarning && (
+                    {isPriceExceeded && (
+                      <p className="text-xs text-destructive flex items-center gap-1 font-medium">
+                        🚫 Prix trop élevé ! Maximum {priceEstimate?.max.toLocaleString()} FCFA
+                      </p>
+                    )}
+                    {priceWarning && !isPriceExceeded && (
                       <p className="text-xs text-amber-600 flex items-center gap-1">
                         ⚠️ {priceWarning}
+                      </p>
+                    )}
+                    {netEarnings && !isPriceExceeded && (
+                      <p className="text-xs text-green-600 font-medium">
+                        💰 Gains nets : {netEarnings.toLocaleString()} FCFA
                       </p>
                     )}
                   </div>
@@ -506,17 +543,41 @@ const ProposeRide = () => {
               </div>
 
               {/* Submit */}
-              <div className="pt-4">
+              <div className="pt-4 space-y-4">
+                {/* Alertes de blocage */}
+                {isVehicleNotConfigured && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                    <p className="text-sm text-destructive font-medium flex items-center gap-2">
+                      🚗 Configurez votre type de véhicule dans{' '}
+                      <button onClick={() => navigate('/profile')} className="underline">
+                        votre profil
+                      </button>
+                    </p>
+                  </div>
+                )}
+                
+                {isPriceExceeded && (
+                  <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3">
+                    <p className="text-sm text-destructive font-medium">
+                      🚫 Le prix dépasse le plafond autorisé ({priceEstimate?.max.toLocaleString()} FCFA)
+                    </p>
+                  </div>
+                )}
+                
                 <Button 
                   type="submit" 
-                  className="w-full" 
+                  className={`w-full ${isFormBlocked ? 'opacity-50 cursor-not-allowed' : ''}`}
                   size="lg"
-                  disabled={submitting || !profile?.is_driver}
+                  disabled={isFormBlocked}
                 >
                   {submitting ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-foreground mr-2" />
                       Publication...
+                    </>
+                  ) : isFormBlocked ? (
+                    <>
+                      🚫 Publication bloquée
                     </>
                   ) : (
                     <>
@@ -525,9 +586,13 @@ const ProposeRide = () => {
                     </>
                   )}
                 </Button>
-                <p className="text-center text-sm text-muted-foreground mt-4">
-                  Votre véhicule : {profile?.vehicle_brand} {profile?.vehicle_model || 'Non configuré'}
-                </p>
+                
+                {profile?.vehicle_type && (
+                  <p className="text-center text-sm text-muted-foreground">
+                    {profile.vehicle_type === 'moto' ? '🏍️' : profile.vehicle_type === 'voiture' ? '🚗' : '🚐'}{' '}
+                    {profile?.vehicle_brand} {profile?.vehicle_model}
+                  </p>
+                )}
               </div>
             </form>
           </div>
