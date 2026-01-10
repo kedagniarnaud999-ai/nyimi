@@ -24,6 +24,7 @@ const Profile = () => {
     phone_number: '',
     bio: '',
     is_driver: false,
+    vehicle_type: '' as '' | 'moto' | 'voiture' | 'minibus',
     vehicle_brand: '',
     vehicle_model: '',
     vehicle_color: '',
@@ -43,6 +44,7 @@ const Profile = () => {
         phone_number: profile.phone_number || '',
         bio: profile.bio || '',
         is_driver: profile.is_driver || false,
+        vehicle_type: (profile.vehicle_type as '' | 'moto' | 'voiture' | 'minibus') || '',
         vehicle_brand: profile.vehicle_brand || '',
         vehicle_model: profile.vehicle_model || '',
         vehicle_color: profile.vehicle_color || '',
@@ -115,6 +117,7 @@ const Profile = () => {
           phone_number: formData.phone_number,
           bio: formData.bio,
           is_driver: formData.is_driver,
+          vehicle_type: formData.is_driver ? formData.vehicle_type || null : null,
           vehicle_brand: formData.is_driver ? formData.vehicle_brand : null,
           vehicle_model: formData.is_driver ? formData.vehicle_model : null,
           vehicle_color: formData.is_driver ? formData.vehicle_color : null,
@@ -282,6 +285,36 @@ const Profile = () => {
                     <p className="text-sm text-muted-foreground">
                       Ajoutez les informations de votre véhicule pour proposer des trajets
                     </p>
+                    
+                    {/* Type de véhicule */}
+                    <div className="space-y-3">
+                      <Label>Type de véhicule *</Label>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          { value: 'moto', label: 'Moto', seats: 1, icon: '🏍️' },
+                          { value: 'voiture', label: 'Voiture', seats: 4, icon: '🚗' },
+                          { value: 'minibus', label: 'Minibus', seats: 8, icon: '🚐' },
+                        ].map((type) => (
+                          <button
+                            key={type.value}
+                            type="button"
+                            onClick={() => setFormData({ ...formData, vehicle_type: type.value as 'moto' | 'voiture' | 'minibus' })}
+                            className={`p-4 rounded-xl border-2 text-center transition-all ${
+                              formData.vehicle_type === type.value
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                          >
+                            <span className="text-2xl block mb-1">{type.icon}</span>
+                            <span className="font-medium text-sm">{type.label}</span>
+                            <span className="text-xs text-muted-foreground block">
+                              {type.seats} place{type.seats > 1 ? 's' : ''} max
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
                     <div className="grid md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="vehicle_brand">Marque</Label>
