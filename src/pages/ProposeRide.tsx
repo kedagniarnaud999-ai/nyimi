@@ -251,8 +251,12 @@ const ProposeRide = () => {
                     <Label htmlFor="departure_city">Ville de départ *</Label>
                     <CityAutocomplete
                       value={formData.departure_city}
-                      onChange={(value, coords) => {
-                        setFormData(prev => ({ ...prev, departure_city: value }));
+                      onChange={(value, coords, address) => {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          departure_city: value,
+                          departure_address: address || prev.departure_address
+                        }));
                         if (coords) setDepartureCoords(coords);
                       }}
                       onMapClick={() => setShowDepartureMap(true)}
@@ -264,8 +268,12 @@ const ProposeRide = () => {
                     <Label htmlFor="arrival_city">Ville d'arrivée *</Label>
                     <CityAutocomplete
                       value={formData.arrival_city}
-                      onChange={(value, coords) => {
-                        setFormData(prev => ({ ...prev, arrival_city: value }));
+                      onChange={(value, coords, address) => {
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          arrival_city: value,
+                          arrival_address: address || prev.arrival_address
+                        }));
                         if (coords) setArrivalCoords(coords);
                       }}
                       onMapClick={() => setShowArrivalMap(true)}
