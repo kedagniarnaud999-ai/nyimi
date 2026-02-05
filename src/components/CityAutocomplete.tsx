@@ -91,43 +91,79 @@ const CityAutocomplete = ({
     }
   };
 
-  // Géolocalisation automatique
+  // Géolocalisation automatique avec meilleure gestion d'erreurs
   const handleGeolocate = () => {
     if (!navigator.geolocation) {
+      import('sonner').then(({ toast }) => {
+        toast.error('Géolocalisation non supportée', {
+          description: 'Votre navigateur ne supporte pas la géolocalisation'
+        });
+      });
       return;
     }
 
     setIsLocating(true);
+    
+    // Afficher un toast de chargement
+    import('sonner').then(({ toast }) => {
+      toast.loading('Localisation en cours...', { id: 'geoloc' });
+    });
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           // Reverse geocoding avec Nominatim
           const response = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${position.coords.latitude}&lon=${position.coords.longitude}&format=json&accept-language=fr`
+            `https://nominatim.openstreetmap.org/reverse?lat=${position.coords.latitude}&lon=${position.coords.longitude}&format=json&accept-language=fr`,
+            { headers: { 'User-Agent': 'NyiMi-App/1.0' } }
           );
+          
+          if (!response.ok) throw new Error('Erreur réseau');
+          
           const data = await response.json();
           
-          // Extraire le nom de la ville
+          // Extraire le nom de la ville avec plus de fallbacks
           const cityName = data.address?.city || 
                           data.address?.town || 
                           data.address?.village || 
                           data.address?.municipality ||
+                          data.address?.suburb ||
+                          data.address?.county ||
                           data.name?.split(',')[0] || 
                           '';
           
-          // Vérifier si c'est une ville connue
+          // Vérifier si c'est une ville connue du Bénin
           const knownCity = findCity(cityName);
-          if (knownCity) {
-            onChange(knownCity.name, { lat: knownCity.lat, lng: knownCity.lng });
-          } else {
-            // Utiliser les coordonnées directement
-            onChange(cityName, { 
-              lat: position.coords.latitude, 
-              lng: position.coords.longitude 
-            });
-          }
+          
+          import('sonner').then(({ toast }) => {
+            toast.dismiss('geoloc');
+            if (knownCity) {
+              onChange(knownCity.name, { lat: knownCity.lat, lng: knownCity.lng });
+              toast.success(`📍 ${knownCity.name}`, {
+                description: `${knownCity.department}, Bénin`
+              });
+            } else if (cityName) {
+              onChange(cityName, { 
+                lat: position.coords.latitude, 
+                lng: position.coords.longitude 
+              });
+              toast.success(`📍 ${cityName}`, {
+                description: 'Position détectée'
+              });
+            } else {
+              toast.warning('Position imprécise', {
+                description: 'Impossible de déterminer votre ville'
+              });
+            }
+          });
         } catch (error) {
           console.error('Erreur de géocodage:', error);
+          import('sonner').then(({ toast }) => {
+            toast.dismiss('geoloc');
+            toast.error('Erreur de géocodage', {
+              description: 'Impossible de trouver votre adresse'
+            });
+          });
         } finally {
           setIsLocating(false);
         }
@@ -135,8 +171,36 @@ const CityAutocomplete = ({
       (error) => {
         console.error('Erreur de géolocalisation:', error);
         setIsLocating(false);
+        
+        import('sonner').then(({ toast }) => {
+          toast.dismiss('geoloc');
+          
+          let message = 'Erreur inconnue';
+          let description = '';
+          
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              message = 'Accès refusé';
+              description = 'Autorisez la géolocalisation dans votre navigateur';
+              break;
+            case error.POSITION_UNAVAILABLE:
+              message = 'Position indisponible';
+              description = 'Vérifiez votre connexion GPS';
+              break;
+            case error.TIMEOUT:
+              message = 'Délai dépassé';
+              description = 'La localisation a pris trop de temps';
+              break;
+          }
+          
+          toast.error(message, { description });
+        });
       },
-      { enableHighAccuracy: true, timeout: 10000 }
+      { 
+        enableHighAccuracy: true, 
+        timeout: 15000,
+        maximumAge: 60000 // Cache position for 1 minute
+      }
     );
   };
 

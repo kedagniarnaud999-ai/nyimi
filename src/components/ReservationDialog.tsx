@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, CreditCard, Minus, Plus } from 'lucide-react';
+import { Users, CreditCard, Minus, Plus, MapPin } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
 import { useReservations } from '@/hooks/useReservations';
+import RouteMapDisplay from './RouteMapDisplay';
 
 interface RideInfo {
   id: string;
@@ -78,15 +79,25 @@ const ReservationDialog = ({ ride, open, onOpenChange, onSuccess }: ReservationD
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Réserver ce trajet</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <MapPin className="w-5 h-5 text-primary" />
+            Réserver ce trajet
+          </DialogTitle>
           <DialogDescription>
             {ride.departure_city} → {ride.arrival_city}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-5 py-2">
+          {/* Route Map */}
+          <RouteMapDisplay
+            departureCity={ride.departure_city}
+            arrivalCity={ride.arrival_city}
+            showDetails={true}
+          />
+
           {/* Seats Selection */}
           <div className="space-y-3">
             <Label className="flex items-center gap-2">
