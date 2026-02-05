@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils';
 
 interface CityAutocompleteProps {
   value: string;
-  onChange: (value: string, coords?: { lat: number; lng: number }) => void;
+  onChange: (value: string, coords?: { lat: number; lng: number }, address?: string) => void;
   onMapClick?: () => void;
   placeholder?: string;
   icon?: 'primary' | 'secondary';
@@ -132,23 +132,31 @@ const CityAutocomplete = ({
                           data.name?.split(',')[0] || 
                           '';
           
+          // Construire l'adresse du point de repère
+          const addressParts: string[] = [];
+          if (data.address?.road) addressParts.push(data.address.road);
+          if (data.address?.neighbourhood) addressParts.push(data.address.neighbourhood);
+          if (data.address?.suburb && data.address.suburb !== cityName) addressParts.push(data.address.suburb);
+          if (data.address?.quarter) addressParts.push(data.address.quarter);
+          const landmarkAddress = addressParts.length > 0 ? addressParts.join(', ') : '';
+          
           // Vérifier si c'est une ville connue du Bénin
           const knownCity = findCity(cityName);
           
           import('sonner').then(({ toast }) => {
             toast.dismiss('geoloc');
             if (knownCity) {
-              onChange(knownCity.name, { lat: knownCity.lat, lng: knownCity.lng });
+              onChange(knownCity.name, { lat: knownCity.lat, lng: knownCity.lng }, landmarkAddress);
               toast.success(`📍 ${knownCity.name}`, {
-                description: `${knownCity.department}, Bénin`
+                description: landmarkAddress || `${knownCity.department}, Bénin`
               });
             } else if (cityName) {
               onChange(cityName, { 
                 lat: position.coords.latitude, 
                 lng: position.coords.longitude 
-              });
+              }, landmarkAddress);
               toast.success(`📍 ${cityName}`, {
-                description: 'Position détectée'
+                description: landmarkAddress || 'Position détectée'
               });
             } else {
               toast.warning('Position imprécise', {
